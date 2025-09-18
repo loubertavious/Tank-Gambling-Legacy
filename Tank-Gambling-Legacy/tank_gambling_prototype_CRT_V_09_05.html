@@ -1,0 +1,3227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TANK GAMBLING</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap');
+    
+    html, body { 
+      margin: 0; 
+      height: 100%; 
+      background: #000; 
+      color: #ffffff; 
+      font-family: 'Press Start 2P', monospace;
+      overflow: hidden;
+      image-rendering: pixelated;
+      filter: blur(0.2px);
+    }
+    
+    /* Balanced CRT scanlines with moderate glow */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.4),
+          rgba(0, 0, 0, 0.4) 1px,
+          transparent 1px,
+          transparent 2px
+        ),
+        radial-gradient(
+          circle at 50% 50%,
+          rgba(255, 255, 255, 0.04) 0%,
+          rgba(255, 255, 255, 0.02) 30%,
+          transparent 70%
+        );
+      pointer-events: none;
+      z-index: 1000;
+      animation: scanlines 0.1s linear infinite;
+      filter: blur(0.3px);
+    }
+    
+    @keyframes scanlines {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(2px); }
+    }
+    
+    /* CRT curvature effect */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 30% / 5%;
+      box-shadow: 
+        inset 0 0 100px rgba(255, 255, 255, 0.1),
+        inset 0 0 200px rgba(0, 0, 0, 0.8);
+      pointer-events: none;
+      z-index: 999;
+    }
+    
+    canvas { 
+      display: block; 
+      margin: 0 auto; 
+      margin-top: 60px;
+      image-rendering: pixelated;
+      border: 2px solid #333;
+      background: #000;
+      filter: blur(0.4px);
+      box-shadow: 
+        0 0 20px rgba(255, 255, 255, 0.1),
+        0 0 40px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Minimal HUD */
+    #hud { 
+      position: fixed; 
+      top: 20px; 
+      left: 50%; 
+      transform: translateX(-50%); 
+      font-size: 14px; 
+      color: #ffffff;
+      z-index: 1001;
+      text-align: center;
+    }
+    
+    #msg { 
+      position: fixed; 
+      top: 50%; 
+      left: 50%; 
+      transform: translate(-50%, -50%); 
+      font-size: 20px; 
+      display: none; 
+      color: #ffff00;
+      z-index: 1001;
+      text-align: center;
+    }
+    
+    #help { 
+      position: fixed; 
+      bottom: 20px; 
+      left: 50%; 
+      transform: translateX(-50%); 
+      font-size: 10px; 
+      color: #ffffff;
+      z-index: 1001;
+      text-align: center;
+    }
+
+    /* Simple score display */
+    #scores { 
+      position: fixed; 
+      top: 20px; 
+      left: 20px; 
+      right: 20px; 
+      display: flex; 
+      justify-content: space-between; 
+      z-index: 1001;
+    }
+    
+    #kills { 
+      position: fixed; 
+      top: 52px; 
+      left: 20px; 
+      right: 20px; 
+      display: flex; 
+      justify-content: space-between; 
+      z-index: 1001;
+    }
+    
+    .scoreBadge { 
+      background: #000;
+      border: 2px solid #ffffff;
+      color: #ffffff;
+      padding: 8px 16px;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    /* Simple perk display */
+    #perks { 
+      position: fixed; 
+      top: 90px; 
+      right: 20px; 
+      display: flex; 
+      flex-direction: column;
+      gap: 10px; 
+      z-index: 1001;
+      max-width: 200px;
+    }
+    
+    .perkCol { 
+      background: #000;
+      border: 1px solid #ffffff;
+      padding: 8px;
+      max-width: 180px;
+    }
+    
+    .perkTitle { 
+      font-size: 7px; 
+      margin-bottom: 6px; 
+      text-transform: uppercase; 
+      text-align: center;
+      color: #ffffff;
+    }
+    
+    .perkList { 
+      list-style: none; 
+      padding: 0; 
+      margin: 0; 
+      font-size: 7px;
+      color: #ffffff;
+    }
+    
+    .perkList li { 
+      margin-bottom: 6px;
+      padding: 4px 6px;
+      border: 1px solid #333;
+      line-height: 1.3;
+    }
+    
+    .perkList li strong { 
+      display: block;
+      margin-bottom: 3px;
+      font-size: 8px;
+    }
+    
+    .perkList .good { 
+      display: block;
+      color: #00ff88; 
+      margin-bottom: 1px;
+    }
+    
+    .perkList .bad { 
+      display: block;
+      color: #ff4444; 
+    }
+    
+    /* Rarity styling */
+    .perkList .rarity-rare {
+      color: #00aaff;
+      font-weight: bold;
+    }
+    
+    .perkList .rarity-legendary {
+      color: #ffdd00;
+      font-weight: bold;
+      text-shadow: 0 0 2px #ffdd00;
+    }
+    
+    /* Legendary perk animation */
+    @keyframes legendaryGlow {
+      0% { 
+        box-shadow: 0 0 10px #ffdd00, 0 0 20px #ffdd00, 0 0 30px #ffdd00;
+        transform: scale(1.0);
+      }
+      100% { 
+        box-shadow: 0 0 15px #ffdd00, 0 0 25px #ffdd00, 0 0 35px #ffdd00;
+        transform: scale(1.02);
+      }
+    }
+    
+    /* Mythical perk animation */
+    @keyframes mythicalGlow {
+      0% { 
+        box-shadow: 0 0 15px #ffff00, 0 0 25px #ffff00, 0 0 35px #ffff00, 0 0 45px #ffff00;
+        transform: scale(1.0);
+        filter: hue-rotate(0deg);
+      }
+      100% { 
+        box-shadow: 0 0 20px #ffff00, 0 0 30px #ffff00, 0 0 40px #ffff00, 0 0 50px #ffff00;
+        transform: scale(1.03);
+        filter: hue-rotate(30deg);
+      }
+    }
+
+    /* Simple UI overlay */
+    #ui { 
+      position: fixed;
+      inset: 0; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      pointer-events: none;
+      z-index: 1001;
+    }
+    
+    #choiceUI { 
+      display: none; 
+      gap: 20px; 
+      pointer-events: auto;
+    }
+    
+    .card {
+      width: 180px; 
+      height: 100px; 
+      background: #000;
+      border: 2px solid #ffffff; 
+      padding: 12px; 
+      cursor: pointer; 
+      text-align: center;
+      font-size: 9px;
+      color: #ffffff;
+    }
+    
+    .card:hover {
+      border-color: #ffff00;
+      background: #111;
+    }
+
+    /* Simple title */
+    .game-title {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: #ffffff;
+      z-index: 1001;
+    }
+
+    /* Death overlay */
+    #deathOverlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      pointer-events: none;
+      z-index: 2000;
+      opacity: 0;
+    }
+    .deathTitle {
+      color: #8b0000;
+      text-shadow: 0 0 2px #000, 0 0 8px rgba(139,0,0,0.6);
+      font-family: 'Press Start 2P', monospace;
+      font-weight: 900;
+      letter-spacing: 3px;
+      font-size: 72px;
+    }
+    #deathSubtext {
+      margin-top: 14px;
+      color: #ffffff;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 16px;
+      text-shadow: 0 0 2px #000;
+    }
+    @keyframes youDiedFade {
+      0%   { opacity: 0; transform: scale(1.06); }
+      20%  { opacity: 1; transform: scale(1.0); }
+      70%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    
+    /* Win overlay */
+    #winOverlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      pointer-events: auto;
+      z-index: 2500;
+      background: rgba(0,0,0,0.85);
+    }
+    .winTitle {
+      color: #ffd700;
+      text-shadow: 0 0 2px #000, 0 0 8px rgba(255,215,0,0.6);
+      font-family: 'Press Start 2P', monospace;
+      font-weight: 900;
+      letter-spacing: 3px;
+      font-size: 56px;
+      text-align: center;
+    }
+    #playAgainBtn {
+      margin-top: 24px;
+      background: #000;
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      padding: 12px 22px;
+      cursor: pointer;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+    }
+    #playAgainBtn:hover {
+      border-color: #ffff00;
+      color: #ffff00;
+    }
+
+    /* Zombies over overlay */
+    #zOverOverlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      pointer-events: auto;
+      z-index: 2500;
+      background: rgba(0,0,0,0.88);
+    }
+    #zOverTitle {
+      color: #ff4444;
+      text-shadow: 0 0 2px #000, 0 0 8px rgba(255,68,68,0.6);
+      font-family: 'Press Start 2P', monospace;
+      font-weight: 900;
+      letter-spacing: 3px;
+      font-size: 48px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    #zOverStats {
+      color: #ffffff;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+      text-align: center;
+      margin-top: 6px;
+    }
+    #zOverBtn {
+      margin-top: 24px;
+      background: #000;
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      padding: 12px 22px;
+      cursor: pointer;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+    }
+    #zOverBtn:hover {
+      border-color: #ffff00;
+      color: #ffff00;
+    }
+
+    /* Dev console */
+    #devConsole {
+      position: fixed;
+      left: 20px;
+      bottom: 20px;
+      width: 60%;
+      max-width: 800px;
+      display: none;
+      flex-direction: column;
+      background: rgba(0,0,0,0.9);
+      border: 2px solid #ffffff;
+      z-index: 3000;
+      pointer-events: auto;
+    }
+    #devLog {
+      height: 220px;
+      overflow-y: auto;
+      padding: 10px;
+      font-size: 10px;
+      color: #00ff88;
+      font-family: 'Press Start 2P', monospace;
+    }
+    #devInput {
+      width: 100%;
+      padding: 10px;
+      border: 0;
+      border-top: 2px solid #333;
+      outline: none;
+      background: #000;
+      color: #ffffff;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+
+    /* Clickable Dev Menu */
+    #devMenuBtn {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 3200;
+      background: #000;
+      color: #fff;
+      border: 2px solid #fff;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 12px;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+    #devMenuBtn:hover { border-color: #ffff00; color: #ffff00; }
+    #devMenu {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      z-index: 3300;
+      background: rgba(0,0,0,0.88);
+    }
+    #devMenuPanel {
+      background:#000; border:2px solid #ffffff; padding:22px; min-width:720px;
+      max-height: 70vh; overflow: auto;
+    }
+    .devRow { display:flex; align-items:center; justify-content: space-between; gap: 10px; margin: 6px 0; }
+    .devPerkName { color:#fff; font-family:'Press Start 2P', monospace; font-size: 12px; }
+    .devBtn { background:#000; color:#fff; border:2px solid #fff; padding:6px 10px; cursor:pointer; font-family:'Press Start 2P', monospace; font-size:10px; }
+    .devBtn:hover { border-color:#ffff00; color:#ffff00; }
+  </style>
+</head>
+<body>
+  <div class="game-title">TANK GAMBLING</div>
+  
+  <canvas id="game" width="1024" height="576"></canvas>
+  <div id="hud"></div>
+  <div id="msg"></div>
+  <div id="deathOverlay"><div class="deathTitle">YOU DIED</div><div id="deathSubtext"></div></div>
+  <div id="winOverlay"><div class="winTitle" id="winTitle"></div><button id="playAgainBtn">PLAY AGAIN</button></div>
+  <div id="zOverOverlay"><div id="zOverTitle">ZOMBIES FAILED</div><div id="zOverStats"></div><button id="zOverBtn">TRY AGAIN</button></div>
+  <div id="devConsole"><div id="devLog"></div><input id="devInput" placeholder=">" autocomplete="off" /></div>
+  <div id="ui"><div id="choiceUI"></div></div>
+  <button id="devMenuBtn">DEV MENU</button>
+  <div id="devMenu"><div id="devMenuPanel"></div></div>
+  <div id="scores">
+    <div id="p1Score" class="scoreBadge">0</div>
+    <div id="p2Score" class="scoreBadge">0</div>
+  </div>
+  <div id="kills">
+    <div id="p1Kills" class="scoreBadge">K: 0</div>
+    <div id="p2Kills" class="scoreBadge">K: 0</div>
+  </div>
+  <div id="perks">
+    <div class="perkCol" id="p1PerkCol">
+      <div class="perkTitle">P1 UPGRADES</div>
+      <ul id="p1Perks" class="perkList"></ul>
+    </div>
+    <div class="perkCol" id="p2PerkCol">
+      <div class="perkTitle">P2 UPGRADES</div>
+      <ul id="p2Perks" class="perkList"></ul>
+    </div>
+  </div>
+  <div id="help">P1: WASD MOVE, F SHOOT | P2: ARROWS MOVE, / SHOOT | R RESTART | M MUTE | N MUSIC</div>
+  <div id="musicPrompt" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#ffff00;font-family:'Press Start 2P',monospace;font-size:12px;z-index:4000;text-align:center;background:rgba(0,0,0,0.8);padding:20px;border:2px solid #ffff00;">CLICK ANYWHERE TO START MUSIC</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const hud = document.getElementById('hud');
+  const msg = document.getElementById('msg');
+  const choiceUI = document.getElementById('choiceUI');
+  const devMenuBtn = document.getElementById('devMenuBtn');
+  const devMenu = document.getElementById('devMenu');
+  const devMenuPanel = document.getElementById('devMenuPanel');
+  const p1ScoreEl = document.getElementById('p1Score');
+  const p2ScoreEl = document.getElementById('p2Score');
+  const p1KillsEl = document.getElementById('p1Kills');
+  const p2KillsEl = document.getElementById('p2Kills');
+  const p1PerksEl = document.getElementById('p1Perks');
+  const p2PerksEl = document.getElementById('p2Perks');
+  const deathOverlay = document.getElementById('deathOverlay');
+  const deathSubtext = document.getElementById('deathSubtext');
+  const winOverlay = document.getElementById('winOverlay');
+  const winTitle = document.getElementById('winTitle');
+  const playAgainBtn = document.getElementById('playAgainBtn');
+  const zOverOverlay = document.getElementById('zOverOverlay');
+  const zOverStats = document.getElementById('zOverStats');
+  const zOverBtn = document.getElementById('zOverBtn');
+  // Remove old dev console usage; we'll use clickable menu
+
+  // ---------- SFX System ----------
+  const SFX = (function(){
+    let ctx, muted = false;
+    let musicTracks = {};
+    let currentTrack = null;
+    let musicVolume = 0.4; // Music volume (0-1)
+    let musicMuted = false; // Separate music mute control
+    
+    function ensure(){
+      if(ctx) return;
+      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+    }
+    
+    // Load music track
+    function loadMusic(name, url) {
+      const audio = new Audio(url);
+      audio.loop = true;
+      audio.volume = musicMuted ? 0 : musicVolume;
+      audio.preload = 'auto';
+      musicTracks[name] = audio;
+    }
+    
+    // Play background music
+    function playMusic(name) {
+      if(musicMuted || muted) return;
+      ensure();
+      
+      // Stop current track
+      if(currentTrack) {
+        currentTrack.pause();
+        currentTrack.currentTime = 0;
+      }
+      
+      // Play new track
+      if(musicTracks[name]) {
+        currentTrack = musicTracks[name];
+        currentTrack.volume = (muted || musicMuted) ? 0 : musicVolume;
+        currentTrack.play().catch(e => {
+          console.log('Music play failed:', e);
+          console.log('This is normal - music will start after user interaction');
+        });
+      } else {
+        console.log('Music track not found:', name);
+      }
+    }
+    
+    // Stop music
+    function stopMusic() {
+      if(currentTrack) {
+        currentTrack.pause();
+        currentTrack.currentTime = 0;
+        currentTrack = null;
+      }
+    }
+    
+    // Set music volume
+    function setMusicVolume(volume) {
+      musicVolume = Math.max(0, Math.min(1, volume));
+      if(currentTrack) {
+        currentTrack.volume = (muted || musicMuted) ? 0 : musicVolume;
+      }
+    }
+    
+    // Toggle music mute
+    function toggleMusicMute() {
+      musicMuted = !musicMuted;
+      if(currentTrack) {
+        currentTrack.volume = (muted || musicMuted) ? 0 : musicVolume;
+      }
+      return musicMuted;
+    }
+    
+    function tone(freq=440, duration=0.1, type='square', attack=0.004, decay=0.08, gain=0.18){
+      if(muted) return; ensure();
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(gain, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t + duration + 0.05);
+    }
+    function noise(duration=0.25, band=300, q=0.7, attack=0.003, decay=0.3, gain=0.28){
+      if(muted) return; ensure();
+      const len = Math.max(1, Math.floor(ctx.sampleRate * duration));
+      const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for(let i=0;i<len;i++){ data[i] = (Math.random()*2-1); }
+      const src = ctx.createBufferSource(); src.buffer = buffer;
+      const fil = ctx.createBiquadFilter(); fil.type = 'bandpass'; fil.frequency.value = band; fil.Q.value = q;
+      const g = ctx.createGain(); const t = ctx.currentTime;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(gain, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+      src.connect(fil); fil.connect(g); g.connect(ctx.destination);
+      src.start(); src.stop(t + duration + 0.05);
+    }
+    function play(name){
+      switch(name){
+        case 'shoot': tone(900,0.08,'square',0.001,0.06,0.17); tone(700,0.09,'square',0.001,0.07,0.12); break;
+        case 'bounce': tone(1200,0.06,'triangle',0.001,0.08,0.12); break;
+        case 'hit': tone(240,0.12,'sawtooth',0.003,0.12,0.2); break;
+        case 'explode': noise(0.35,220,0.8,0.002,0.4,0.35); tone(110,0.25,'sine',0.004,0.25,0.25); break;
+        case 'tankExplode': noise(0.55,180,0.9,0.001,0.6,0.45); tone(220,0.18,'sawtooth',0.002,0.2,0.35); tone(90,0.4,'sine',0.01,0.5,0.28); break;
+        case 'upgrade': tone(650,0.08,'triangle'); tone(980,0.1,'triangle'); break;
+        case 'menuOpen': tone(440,0.06,'sine'); tone(660,0.08,'sine'); break;
+        case 'menuSelect': tone(880,0.07,'square'); tone(1320,0.06,'square'); break;
+        case 'roundWin': tone(523,0.15,'sine'); tone(659,0.15,'sine'); tone(784,0.2,'sine'); break;
+        case 'matchWin': tone(523,0.2,'sine'); tone(659,0.2,'sine'); tone(784,0.2,'sine'); tone(1047,0.3,'sine'); break;
+        case 'health': tone(330,0.12,'sine',0.002,0.15,0.18); break;
+        case 'move': tone(200,0.03,'triangle',0.001,0.04,0.035); break;
+        case 'turn': tone(300,0.02,'triangle',0.001,0.03,0.03); break;
+        case 'bossSpawn': noise(0.6,90,0.6,0.001,0.6,0.5); tone(110,0.3,'sine',0.005,0.4,0.35); break;
+        case 'bossRoar': noise(0.7,120,0.9,0.001,0.7,0.55); tone(70,0.25,'sawtooth',0.002,0.35,0.4); break;
+        case 'bossShoot': tone(180,0.08,'square',0.001,0.08,0.25); tone(140,0.1,'square',0.001,0.1,0.18); break;
+        case 'bossDeath': noise(0.8,160,0.7,0.001,0.9,0.7); tone(55,0.4,'sine',0.01,0.6,0.4); break;
+        default: tone(440,0.08); break;
+      }
+    }
+    function isMuted(){ return !!muted; }
+    function setMuted(v){ 
+      muted = !!v; 
+      if(currentTrack) {
+        currentTrack.volume = (muted || musicMuted) ? 0 : musicVolume;
+      }
+    }
+    return { ensure, play, setMuted, isMuted, loadMusic, playMusic, stopMusic, setMusicVolume, toggleMusicMute };
+  })();
+
+  // ---------- Music Loading ----------
+  // Load background music - replace this path with your actual audio file
+  SFX.loadMusic('background', 'music/background.mp3');
+
+  // ---------- helpers ----------
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const choice = arr => arr[Math.floor(Math.random()*arr.length)];
+
+  // ---------- input ----------
+  const keys = new Set();
+  let musicStarted = false;
+  
+  // Start music on first user interaction
+  function startMusicOnInteraction() {
+    if (!musicStarted) {
+      musicStarted = true;
+      SFX.playMusic('background');
+      console.log('Music started on user interaction');
+      
+      // Hide the music prompt
+      const musicPrompt = document.getElementById('musicPrompt');
+      if (musicPrompt) {
+        musicPrompt.style.display = 'none';
+      }
+    }
+  }
+  
+  window.addEventListener('keydown', e=>{ 
+    keys.add(e.key); 
+    SFX.ensure();
+    startMusicOnInteraction(); // Start music on any key press
+    
+    if(e.key === 'm' || e.key === 'M') {
+      const wasMuted = SFX.isMuted();
+      SFX.setMuted(!wasMuted);
+    }
+    if(e.key === 'n' || e.key === 'N') {
+      const musicMuted = SFX.toggleMusicMute();
+      console.log('Music', musicMuted ? 'muted' : 'unmuted');
+    }
+  });
+  window.addEventListener('keyup',   e=> { keys.delete(e.key); });
+  
+  // Also start music on mouse click
+  window.addEventListener('click', startMusicOnInteraction);
+
+  // ---------- game config ----------
+  const ROUND_WINS = 5;
+  const arenaPadding = 20;
+  let state = 'start'; // start -> draft -> round
+  let roundNumber = 1;
+  let gameMode = 'versus'; // 'versus' | 'zombies'
+  let paused = false; // global pause (used for zombies perk drafts)
+
+  // Maze setup
+  const innerW = W - 2*arenaPadding, innerH = H - 2*arenaPadding;
+  const COLS = 12, ROWS = 6;
+  const CW = Math.floor(innerW / COLS), CH = Math.floor(innerH / ROWS);
+  const WT = 8;
+  const LOOP_CHANCE = 0.18; // Probability to remove extra walls to create loops
+  let walls = []; // {x,y,w,h}
+
+  // ---------- zombies mode state ----------
+  let zombies = [];
+  let wave = 0;
+  let zombiesRemaining = 0;
+  let nextWaveTimer = 0;
+  let boss = null; // active boss entity when present
+  let bossActive = false; // true on boss waves while boss alive
+
+  // ---------- maze ----------
+  function genMaze(){
+    const cells = Array.from({length:ROWS},()=>Array.from({length:COLS},()=>({v:false,w:{N:1,E:1,S:1,W:1}})));
+    const stack=[]; let cx=0, cy=0; cells[cy][cx].v=true; stack.push([cx,cy]);
+    const dirs = [[0,-1,'N','S'],[1,0,'E','W'],[0,1,'S','N'],[-1,0,'W','E']];
+    while(stack.length){
+      const [x,y] = stack[stack.length-1];
+      const neigh = dirs.map(([dx,dy,da,db])=>({nx:x+dx,ny:y+dy,da,db}))
+        .filter(n=>n.nx>=0&&n.nx<COLS&&n.ny>=0&&n.ny<ROWS&&!cells[n.ny][n.nx].v);
+      if(neigh.length===0){ stack.pop(); continue; }
+      const n = choice(neigh);
+      cells[y][x].w[n.da]=0; cells[n.ny][n.nx].w[n.db]=0;
+      cells[n.ny][n.nx].v=true; stack.push([n.nx,n.ny]);
+    }
+    
+    // Introduce additional openings to create multiple paths (loops)
+    for(let y=0;y<ROWS;y++){
+      for(let x=0;x<COLS;x++){
+        if(Math.random() < LOOP_CHANCE){
+          const openable = [];
+          // Only consider internal walls (E,S) to avoid outer border removal
+          if(x < COLS-1 && cells[y][x].w.E === 1) openable.push('E');
+          if(y < ROWS-1 && cells[y][x].w.S === 1) openable.push('S');
+          if(openable.length){
+            const pick = openable[Math.floor(Math.random()*openable.length)];
+            if(pick==='E'){
+              cells[y][x].w.E = 0; cells[y][x+1].w.W = 0;
+            } else if(pick==='S'){
+              cells[y][x].w.S = 0; cells[y+1][x].w.N = 0;
+            }
+          }
+        }
+      }
+    }
+    
+    const rects=[];
+    for(let y=0;y<ROWS;y++){
+      for(let x=0;x<COLS;x++){
+        const ox = arenaPadding + x*CW, oy = arenaPadding + y*CH;
+        if(cells[y][x].w.E){ rects.push({x:ox+CW-WT/2, y:oy-WT/2, w:WT, h:CH+WT}); }
+        if(cells[y][x].w.S){ rects.push({x:ox-WT/2, y:oy+CH-WT/2, w:CW+WT, h:WT}); }
+      }
+    }
+    rects.push({x:arenaPadding-WT/2, y:arenaPadding-WT/2, w:WT, h:innerH+WT});
+    rects.push({x:arenaPadding+innerW-WT/2, y:arenaPadding-WT/2, w:WT, h:innerH+WT});
+    rects.push({x:arenaPadding-WT/2, y:arenaPadding-WT/2, w:innerW+WT, h:WT});
+    rects.push({x:arenaPadding-WT/2, y:arenaPadding+innerH-WT/2, w:innerW+WT, h:WT});
+    walls = mergeCollinear(rects);
+  }
+  function mergeCollinear(rects){
+    let merged = rects.slice(); let changed=true;
+    while(changed){
+      changed=false;
+      outer: for(let i=0;i<merged.length;i++){
+        for(let j=i+1;j<merged.length;j++){
+          const a=merged[i], b=merged[j];
+          if(a.w===WT && b.w===WT && a.x===b.x && !(a.y+a.h<b.y || b.y+b.h<a.y)){
+            merged[i]={x:a.x,y:Math.min(a.y,b.y),w:WT,h:Math.max(a.y+a.h,b.y+b.h)-Math.min(a.y,b.y)};
+            merged.splice(j,1); changed=true; break outer;
+          }
+          if(a.h===WT && b.h===WT && a.y===b.y && !(a.x+a.w<b.x || b.x+b.w<a.x)){
+            merged[i]={x:Math.min(a.x,b.x),y:a.y,w:Math.max(a.x+a.w,b.x+b.w)-Math.min(a.x,b.x),h:WT};
+            merged.splice(j,1); changed=true; break outer;
+          }
+        }
+      }
+    }
+    return merged;
+  }
+
+  // ---------- entities ----------
+  function makeTank(x,y,color,control){
+    return {
+      x,y, size:32, a:-Math.PI/2,
+      thrust: 180, rotSpeed: 2.6,
+      fireCd: 0.8, fireTimer: 0,
+      bulletSpeed: 380, maxBounces: 0, pierce:0, multishot:1, spread: 15, recoil: 0,
+      damage: 1, // Add missing damage property
+      alive:true, color, control, score:0,
+      hp:3, maxHp:3, showHpTimer:0,
+      perks:[],
+      moveSfxTimer: 0, turnSfxTimer: 0
+    };
+  }
+
+  const p1 = makeTank(W*0.25, H*0.5, '#ff69b4', 'P1');
+  const p2 = makeTank(W*0.75, H*0.5, '#0080ff', 'P2');
+  const players = [p1,p2];
+  let bullets = [];
+  let mines = [];
+  let screenShake = 0;
+  let motionTrails = []; // For CRT motion trails
+  let particles = [];
+  let deathAnim = { active:false, t:0, duration:0, x:0, y:0 };
+
+  // ---------- upgrades ----------
+  function applyUpgrade(player, up){
+    console.log('Applying upgrade:', up.name, 'to player:', player.control);
+    console.log('Before:', { damage: player.damage, maxBounces: player.maxBounces, pierce: player.pierce, multishot: player.multishot, fireCd: player.fireCd, bulletSpeed: player.bulletSpeed });
+    
+    up.apply(player);
+    
+    // Play upgrade sound
+    SFX.play('upgrade');
+    
+    console.log('After:', { damage: player.damage, maxBounces: player.maxBounces, pierce: player.pierce, multishot: player.multishot, fireCd: player.fireCd, bulletSpeed: player.bulletSpeed });
+    
+    if(!player.perks) player.perks = [];
+    player.perks.push({ name: up.name, good: up.good, bad: up.bad, color: up.color, rarity: up.rarity });
+    refreshPerks();
+  }
+
+  const upgradePool = [
+    // COMMON PERKS (White - Basic effects)
+    {
+      name:'Rapid Fire',
+      good:'+25% fire rate',
+      bad:'-15% bullet speed',
+      apply:p=>{ p.fireCd*=0.75; p.bulletSpeed*=0.85; },
+      color: '#ffffff',
+      rarity: 'common'
+    },
+    {
+      name:'Heavy Rounds',
+      good:'+2 bullet damage',
+      bad:'-20% fire rate',
+      apply:p=>{ p.damage+=2; p.fireCd*=1.2; },
+      color: '#ff4444',
+      rarity: 'common'
+    },
+    {
+      name:'Speed Loader',
+      good:'+40% fire rate',
+      bad:'-1 bullet damage',
+      apply:p=>{ p.fireCd*=0.6; p.damage=Math.max(1,p.damage-1); },
+      color: '#ffffff',
+      rarity: 'common'
+    },
+    {
+      name:'Ricochet',
+      good:'+2 ricochet bounces',
+      bad:'-25% bullet speed',
+      apply:p=>{ p.maxBounces+=2; p.bulletSpeed*=0.75; },
+      color: '#ffff00',
+      rarity: 'common'
+    },
+    {
+      name:'Multishot',
+      good:'+2 bullets per shot (stacks)',
+      bad:'-15% bullet speed',
+      apply:p=>{ p.multishot+=2; p.bulletSpeed*=0.85; },
+      color: '#ff00ff',
+      rarity: 'common'
+    },
+    {
+      name:'Piercing',
+      good:'+1 wall/target pierce',
+      bad:'-15% move speed',
+      apply:p=>{ p.pierce+=1; p.thrust*=0.85; },
+      color: '#ff8800',
+      rarity: 'common'
+    },
+    {
+      name:'Energy Drink',
+      good:'+18% move speed',
+      bad:'-10% turn speed',
+      apply:p=>{ p.thrust*=1.18; p.rotSpeed*=0.9; },
+      color: '#00ff41',
+      rarity: 'common'
+    },
+    {
+      name:'Trick Shot',
+      good:'+20% bullet speed',
+      bad:'-1 ricochet cap',
+      apply:p=>{ p.bulletSpeed*=1.2; p.maxBounces=Math.max(0,p.maxBounces-1); },
+      color: '#ffffff',
+      rarity: 'common'
+    },
+    {
+      name:'Beyblade',
+      good:'+30% turn speed',
+      bad:'-10% move speed',
+      apply:p=>{ p.rotSpeed*=1.3; p.thrust*=0.9; },
+      color: '#00ff41',
+      rarity: 'common'
+    },
+    {
+      name:'Extra Health',
+      good:'+2 max health & heal',
+      bad:'Reload +10%',
+      apply:p=>{ p.maxHp+=2; p.hp=p.maxHp; p.fireCd*=1.1; },
+      color: '#00ff41',
+      rarity: 'common'
+    },
+    
+    // RARE PERKS (Blue - Enhanced effects)
+    {
+      name:'Spray & Pray',
+      good:'+60% fire rate',
+      bad:'-25% bullet speed, -1 damage',
+      apply:p=>{ p.fireCd*=0.4; p.bulletSpeed*=0.75; p.damage=Math.max(1,p.damage-1); },
+      color: '#00aaff',
+      rarity: 'rare'
+    },
+    {
+      name:'Big Boi Bullets',
+      good:'+4 bullet damage',
+      bad:'-30% fire rate, -15% move speed',
+      apply:p=>{ p.damage+=4; p.fireCd*=1.3; p.thrust*=0.85; },
+      color: '#ff0066',
+      rarity: 'rare'
+    },
+    {
+      name:'Bouncy Castle',
+      good:'+4 ricochet bounces',
+      bad:'-35% bullet speed, -20% move speed',
+      apply:p=>{ p.maxBounces+=4; p.bulletSpeed*=0.65; p.thrust*=0.8; },
+      color: '#ffff66',
+      rarity: 'rare'
+    },
+    {
+      name:'Too Many Bullets',
+      good:'+3 bullets per shot (stacks)',
+      bad:'-25% bullet speed, -20% fire rate',
+      apply:p=>{ p.multishot+=3; p.bulletSpeed*=0.75; p.fireCd*=1.2; },
+      color: '#ff66ff',
+      rarity: 'rare'
+    },
+    {
+      name:'Wall Hacker',
+      good:'+2 wall/target pierce',
+      bad:'-25% move speed, -15% turn speed',
+      apply:p=>{ p.pierce+=2; p.thrust*=0.75; p.rotSpeed*=0.85; },
+      color: '#ffaa44',
+      rarity: 'rare'
+    },
+    {
+      name:'Zoomies',
+      good:'+35% move speed, +25% turn speed',
+      bad:'-20% fire rate, -1 damage',
+      apply:p=>{ p.thrust*=1.35; p.rotSpeed*=1.25; p.fireCd*=1.2; p.damage=Math.max(1,p.damage-1); },
+      color: '#44ff88',
+      rarity: 'rare'
+    },
+    {
+      name:'Speed Demon',
+      good:'+40% bullet speed, +25% fire rate',
+      bad:'-2 ricochet cap, -15% move speed',
+      apply:p=>{ p.bulletSpeed*=1.4; p.fireCd*=0.75; p.maxBounces=Math.max(0,p.maxBounces-2); p.thrust*=0.85; },
+      color: '#ffffff',
+      rarity: 'rare'
+    },
+    {
+      name:'Chonky Tank',
+      good:'+4 max health & heal, +15% move speed',
+      bad:'-25% fire rate, -20% turn speed',
+      apply:p=>{ p.maxHp+=4; p.hp=p.maxHp; p.thrust*=1.15; p.fireCd*=1.25; p.rotSpeed*=0.8; },
+      color: '#44ff88',
+      rarity: 'rare'
+    },
+    
+    // LEGENDARY PERKS (Gold - Extreme effects)
+    {
+      name:'Bullet Hell',
+      good:'+70% fire rate, +2 bullets per shot (stacks)',
+      bad:'-35% bullet speed, -1 damage, -20% move speed',
+      apply:p=>{ p.fireCd*=0.59; p.multishot+=2; p.bulletSpeed*=0.65; p.damage=Math.max(1,p.damage-1); p.thrust*=0.8; },
+      color: '#ffdd00',
+      rarity: 'legendary'
+    },
+    {
+      name:'Delete Button',
+      good:'+6 bullet damage, +2 pierce',
+      bad:'-35% fire rate, -25% move speed, -15% turn speed',
+      apply:p=>{ p.damage+=6; p.pierce+=2; p.fireCd*=1.35; p.thrust*=0.75; p.rotSpeed*=0.85; },
+      color: '#ff4400',
+      rarity: 'legendary'
+    },
+    {
+      name:'Pinball Wizard',
+      good:'+6 ricochet bounces, +35% bullet speed',
+      bad:'-45% move speed, -30% turn speed, -1 damage',
+      apply:p=>{ p.maxBounces+=6; p.bulletSpeed*=1.35; p.thrust*=0.55; p.rotSpeed*=0.7; p.damage=Math.max(1,p.damage-1); },
+      color: '#ffff00',
+      rarity: 'legendary'
+    },
+    {
+      name:'Bullet Tsunami',
+      good:'+4 bullets per shot (stacks), +30% bullet speed',
+      bad:'-30% fire rate, -40% move speed, -1 damage',
+      apply:p=>{ p.multishot+=4; p.bulletSpeed*=1.3; p.fireCd*=1.3; p.thrust*=0.6; p.damage=Math.max(1,p.damage-1); },
+      color: '#ff00ff',
+      rarity: 'legendary'
+    },
+    {
+      name:'Sonic Tank',
+      good:'+45% move speed, +40% turn speed, +5 max health',
+      bad:'-35% fire rate, -2 damage, -30% bullet speed',
+      apply:p=>{ p.thrust*=1.45; p.rotSpeed*=1.4; p.maxHp+=5; p.hp=p.maxHp; p.fireCd*=1.35; p.damage=Math.max(1,p.damage-2); p.bulletSpeed*=0.7; },
+      color: '#00ffff',
+      rarity: 'legendary'
+    },
+    {
+      name:'Overkill',
+      good:'+10 bullet damage, +4 pierce, +70% bullet speed',
+      bad:'-55% fire rate, -50% move speed, -45% turn speed',
+      apply:p=>{ p.damage+=10; p.pierce+=4; p.bulletSpeed*=1.7; p.fireCd*=1.55; p.thrust*=0.5; p.rotSpeed*=0.55; },
+      color: '#ff0000',
+      rarity: 'legendary'
+    },
+    
+    // MYTHICAL PERKS (Rainbow - Completely broken effects)
+    {
+      name:'Piss Missile',
+      good:'+1000% fire rate, bright yellow bullets, normal bullet speed',
+      bad:'-90% move speed, -80% turn speed, -95% max health',
+      apply:p=>{ p.fireCd*=0.1; p.thrust*=0.1; p.rotSpeed*=0.2; p.maxHp = Math.max(1, Math.floor(p.maxHp * 0.05)); p.hp = p.maxHp; p.hasPissMissiles = true; },
+      color: '#ffff00',
+      rarity: 'mythical'
+    }
+  ];
+
+  // Extend upgrade pool with Landmines perk
+  upgradePool.push({
+    name:'Landmines',
+    good:'Plants a mine every 3rd shot',
+    bad:'-10% move speed',
+    apply:p=>{ p.thrust*=0.9; p.hasLandmines = true; p.shotCounter = 0; },
+    color:'#ffaa00',
+    rarity: 'common'
+  });
+
+  // ---------- round flow ----------
+  function resetRound(){
+    bullets = []; mines = [];
+    genMaze();
+    p1.x = arenaPadding + CW*0.5; p1.y = arenaPadding + CH*0.5; p1.a = -Math.PI/2;
+    p2.x = arenaPadding + (COLS-0.5)*CW; p2.y = arenaPadding + (ROWS-0.5)*CH; p2.a = -Math.PI/2;
+    for(const t of players){ t.alive=true; t.hp=t.maxHp; t.showHpTimer=0; t.shotCounter=0; }
+    msg.style.display='none';
+  }
+
+  function updateControls(t, dt){
+    const playerKey = (t===p1) ? 'p1' : 'p2';
+    const isController = controlConfig[playerKey].type === 'controller';
+    if(!isController && t.control==='P1'){
+      const left = keys.has('a') || keys.has('A');
+      const right = keys.has('d') || keys.has('D');
+      const up = keys.has('w') || keys.has('W');
+      const down = keys.has('s') || keys.has('S');
+      const fire = keys.has('f') || keys.has('F');
+        
+        // Play reduced/rare turn sounds
+        if(left) { 
+          t.a -= t.rotSpeed*dt; 
+          if((t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer = 0.35; }
+        }
+        if(right) { 
+          t.a += t.rotSpeed*dt; 
+          if((t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer = 0.35; }
+        }
+        const dir = (up?1:0) + (down?-1:0);
+        // Play reduced/rare movement sound
+        if(dir !== 0 && (t.moveSfxTimer||0)<=0){ SFX.play('move'); t.moveSfxTimer = 0.35; }
+        const nx = t.x + Math.cos(t.a) * t.thrust * dir * dt;
+        const ny = t.y + Math.sin(t.a) * t.thrust * dir * dt;
+        attemptMove(t, nx, ny);
+        if(fire) tryFire(t);
+    } else if(!isController) {
+      const left = keys.has('ArrowLeft');
+      const right = keys.has('ArrowRight');
+      const up = keys.has('ArrowUp');
+      const down = keys.has('ArrowDown');
+      const fire = keys.has('/') || keys.has('?');
+        
+        // Play reduced/rare turn sounds
+        if(left) { 
+          t.a -= t.rotSpeed*dt; 
+          if((t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer = 0.35; }
+        }
+        if(right) { 
+          t.a += t.rotSpeed*dt; 
+          if((t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer = 0.35; }
+        }
+        const dir = (up?1:0) + (down?-1:0);
+        // Play reduced/rare movement sound
+        if(dir !== 0 && (t.moveSfxTimer||0)<=0){ SFX.play('move'); t.moveSfxTimer = 0.35; }
+        const nx = t.x + Math.cos(t.a) * t.thrust * dir * dt;
+        const ny = t.y + Math.sin(t.a) * t.thrust * dir * dt;
+        attemptMove(t, nx, ny);
+        if(fire) tryFire(t);
+    } else {
+      // Controller input
+      const idx = gpIndex[playerKey];
+      const gp = idx!=null ? gamepads[idx] : null;
+      if(gp){
+        const lx = applyDeadzone(gp.axes[0] || 0);
+        const ly = applyDeadzone(gp.axes[1] || 0);
+        const rx = applyDeadzone(gp.axes[2] != null ? gp.axes[2] : 0);
+        const ry = applyDeadzone(gp.axes[3] != null ? gp.axes[3] : 0);
+        // Rotation: prefer right-stick X, fallback to left-stick X
+        const turnX = Math.abs(rx) > 0 ? rx : lx;
+        t.a += turnX * t.rotSpeed * dt;
+        // Forward/back from left stick Y (up is negative)
+        const dir = -ly;
+        const nx = t.x + Math.cos(t.a) * t.thrust * dir * dt;
+        const ny = t.y + Math.sin(t.a) * t.thrust * dir * dt;
+        attemptMove(t, nx, ny);
+        // Fire on RT (7) / LT (6) / A (0) / B (1)
+        const firePressed = (gp.buttons[7] && gp.buttons[7].pressed) || (gp.buttons[6] && gp.buttons[6].pressed) || (gp.buttons[0] && gp.buttons[0].pressed) || (gp.buttons[1] && gp.buttons[1].pressed);
+        if(firePressed) tryFire(t);
+        // Optional move/turn sfx throttle
+        if(Math.abs(turnX) > 0.2 && (t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer = 0.35; }
+        if(Math.abs(dir) > 0.2 && (t.moveSfxTimer||0)<=0){ SFX.play('move'); t.moveSfxTimer = 0.35; }
+      }
+    }
+  }
+
+  function attemptMove(t, nx, ny){ 
+    // Create motion trail for CRT effect
+    if (t.alive) {
+      // Create darker version of tank color for trail
+      let trailColor;
+      if (t.color === '#ff69b4') { // P1 pink
+        trailColor = '#d14a8a';
+      } else if (t.color === '#0080ff') { // P2 blue
+        trailColor = '#2a7ac8';
+      } else {
+        trailColor = t.color; // fallback
+      }
+      
+      motionTrails.push({
+        x: t.x,
+        y: t.y,
+        color: trailColor,
+        alpha: 0.8,
+        size: t.size * 1.2,
+        life: 0.15,
+        angle: t.a
+      });
+    }
+    
+    t.x = nx; t.y = ny; resolveTankCollisions(t); 
+  }
+
+  // ---------- zombies ----------
+  // Boss helpers
+  function nearestLivingPlayer(x, y){
+    const targets = players.filter(p=>p.alive);
+    if(targets.length===0) return { target:null, d2: Infinity };
+    let target = targets[0];
+    let bestD2 = (target.x-x)*(target.x-x) + (target.y-y)*(target.y-y);
+    for(let i=1;i<targets.length;i++){
+      const p = targets[i];
+      const d2 = (p.x-x)*(p.x-x) + (p.y-y)*(p.y-y);
+      if(d2 < bestD2){ bestD2 = d2; target = p; }
+    }
+    return { target, d2: bestD2 };
+  }
+
+  function makeBoss(){
+    // Boss spawns on right side mid
+    const x = arenaPadding + innerW - 40;
+    const y = arenaPadding + innerH * 0.5;
+    const baseHp = Math.ceil(20 + wave * 6);
+    return {
+      x, y, size: 56, a: 0,
+      thrust: 70, rotSpeed: 1.4,
+      hp: baseHp, maxHp: baseHp,
+      shootTimer: 0, shootCd: 1.25,
+      touchDamage: 1.0, touchCooldown: 0.9, touchTimer: 0,
+      color: '#ff00aa', _dead: false
+    };
+  }
+
+  function updateBoss(dt){
+    if(!boss || boss._dead) return;
+    // Aim and move toward nearest living player
+    const nd = nearestLivingPlayer(boss.x, boss.y);
+    if(nd.target){
+      const desired = Math.atan2(nd.target.y - boss.y, nd.target.x - boss.x);
+      let d = desired - boss.a; while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2;
+      const maxTurn = boss.rotSpeed * dt;
+      boss.a += Math.max(-maxTurn, Math.min(maxTurn, d));
+      const nx = boss.x + Math.cos(boss.a) * boss.thrust * dt;
+      const ny = boss.y + Math.sin(boss.a) * boss.thrust * dt;
+      const probe = { x: nx, y: ny, size: boss.size };
+      resolveTankCollisions(probe);
+      boss.x = probe.x; boss.y = probe.y;
+    }
+    // Contact damage
+    boss.touchTimer = Math.max(0, boss.touchTimer - dt);
+    if(boss.touchTimer<=0){
+      for(const p of players){
+        if(!p.alive) continue;
+        if(circleHit(boss.x,boss.y,boss.size/2, p.x,p.y,p.size/2)){
+          p.hp = Math.max(0, p.hp - boss.touchDamage);
+          p.showHpTimer = 1.0; SFX.play('hit');
+          if(p.hp<=0){ if(p.alive){ SFX.play('tankExplode'); spawnDeathExplosion(p.x, p.y); } p.alive=false; }
+          boss.touchTimer = boss.touchCooldown; break;
+        }
+      }
+    }
+    // Shooting: aimed triple-shot
+    boss.shootTimer = Math.max(0, boss.shootTimer - dt);
+    if(boss.shootTimer<=0 && nd.target){
+      boss.shootTimer = boss.shootCd;
+      SFX.play('bossShoot');
+      const base = Math.atan2(nd.target.y - boss.y, nd.target.x - boss.x);
+      const spread = 12 * Math.PI/180;
+      const angles = [base, base+spread, base-spread];
+      for(const a of angles){
+        bullets.push({
+          x: boss.x + Math.cos(a)*boss.size*0.6,
+          y: boss.y + Math.sin(a)*boss.size*0.6,
+          vx: Math.cos(a)*300, vy: Math.sin(a)*300,
+          r: 6, damage: 1,
+          maxBounces: 1, pierce: 0,
+          color: '#ff00aa', owner: boss, ownerTeam: 'boss'
+        });
+      }
+    }
+  }
+  function makeZombie(x,y){
+    return {
+      x, y, size: 26, a: 0,
+      thrust: 65, rotSpeed: 1.6,
+      hp: 2, maxHp: 2,
+      touchDamage: 0.5, touchCooldown: 0.8, touchTimer: 0,
+      _dead: false,
+      dirX: 1, dirY: 0, // start moving right by default
+      decideCooldown: 0
+    };
+  }
+
+  function spawnWaveZombies(n){
+    zombies = [];
+    let attempts = 0;
+    for(let i=0;i<n;i++){
+      // spawn along the right edge (opposite of players on the left)
+      let x = arenaPadding + innerW - 12;
+      let y = arenaPadding + 12 + Math.random() * (innerH - 24);
+      const z = makeZombie(x,y);
+      // avoid spawning inside walls by nudging
+      let safe = true;
+      for(const r of walls){
+        const o = circleRectOverlap(z.x, z.y, z.size/2, r);
+        if(o.hit){ safe = false; break; }
+      }
+      if(!safe && attempts++ < 50){ i--; continue; }
+      zombies.push(z);
+    }
+    zombiesRemaining = zombies.length;
+  }
+
+  function startZombies(){
+    // Reset players to co-op start positions
+    genMaze();
+    for(const t of players){ resetPlayer(t); }
+    // Players on left side, spaced vertically, facing right
+    p1.x = arenaPadding + CW*0.5; p1.y = arenaPadding + innerH * 0.33; p1.a = 0;
+    p2.x = arenaPadding + CW*0.5; p2.y = arenaPadding + innerH * 0.66; p2.a = 0;
+    // Zombie-mode progression stats (gradual linear-increasing increments)
+    for(const t of players){
+      t.zKills = 0;
+      t.zPerksGained = 0;
+      t.zIncCurrent = 3; // first increment
+      t.zIncStep = 2;    // increments grow by +2 each perk: 3,5,7,9, ...
+      t.zPerkThreshold = t.zIncCurrent; // first threshold at 3 kills total
+      t.zDraftOpen = false;
+    }
+    zombies = []; wave = 0; zombiesRemaining = 0; nextWaveTimer = 0; mines = [];
+    if(zOverOverlay){ zOverOverlay.style.display = 'none'; }
+    state = 'z_round';
+    spawnNextWave();
+    refreshKills();
+  }
+
+  function spawnNextWave(){
+    wave += 1;
+    // Regenerate maze so the map changes each wave
+    genMaze();
+    // Reposition players on the left side, facing right
+    p1.x = arenaPadding + CW*0.5; p1.y = arenaPadding + innerH * 0.33; p1.a = 0; p1.alive = true; p1.hp = p1.maxHp; p1.showHpTimer = 1.0;
+    p2.x = arenaPadding + CW*0.5; p2.y = arenaPadding + innerH * 0.66; p2.a = 0; p2.alive = true; p2.hp = p2.maxHp; p2.showHpTimer = 1.0;
+    // Clear transient state
+    bullets = []; mines = []; motionTrails = []; particles = [];
+    boss = null; bossActive = false;
+    const isBossWave = (wave % 5) === 0;
+    if(isBossWave){
+      boss = makeBoss(); bossActive = true; SFX.play('bossSpawn'); SFX.play('bossRoar');
+      // Brief boss wave banner for clarity
+      if(msg){
+        msg.style.display = 'block';
+        msg.textContent = 'BOSS WAVE!';
+        setTimeout(()=>{ if(msg){ msg.style.display='none'; msg.textContent=''; } }, 1500);
+      }
+      zombies = []; zombiesRemaining = 0;
+    } else {
+      const count = 4 + Math.floor(wave*2);
+      spawnWaveZombies(count);
+    }
+    // scale zombie health slightly with wave progression
+    for(const z of zombies){
+      z.hp = z.maxHp = Math.ceil(2 + wave * 0.6);
+      // Scale movement speed by wave: slower early, faster later
+      const baseThrust = 50; // very slow start
+      const thrustPerWave = 6; // linear increase per wave
+      z.thrust = Math.max(45, Math.min(120, baseThrust + (wave-1) * thrustPerWave));
+    }
+    refreshKills();
+  }
+
+  function updateZombies(dt){
+    const CHASE_RADIUS = 250;
+    const CHASE_RADIUS2 = CHASE_RADIUS*CHASE_RADIUS;
+
+    function nearestData(x,y){
+      const targets = players.filter(p=>p.alive);
+      if(targets.length===0) return { target:null, d2: Infinity };
+      let target = targets[0];
+      let bestD2 = (target.x-x)*(target.x-x) + (target.y-y)*(target.y-y);
+      for(let i=1;i<targets.length;i++){
+        const p = targets[i];
+        const d2 = (p.x-x)*(p.x-x) + (p.y-y)*(p.y-y);
+        if(d2 < bestD2){ bestD2 = d2; target = p; }
+      }
+      return { target, d2: bestD2 };
+    }
+
+    function canMoveDir(z, dx, dy){
+      const probe = z.size/2 - 3;
+      const px = z.x + dx * (probe + WT + 3);
+      const py = z.y + dy * (probe + WT + 3);
+      for(const r of walls){
+        const o = circleRectOverlap(px, py, probe, r);
+        if(o.hit) return false;
+      }
+      // also keep inside arena
+      const minX = arenaPadding + z.size/2, maxX = arenaPadding + innerW - z.size/2;
+      const minY = arenaPadding + z.size/2, maxY = arenaPadding + innerH - z.size/2;
+      const nx = z.x + dx * 8, ny = z.y + dy * 8;
+      if(nx < minX || nx > maxX || ny < minY || ny > maxY) return false;
+      return true;
+    }
+
+    function atIntersection(z){
+      // near grid centers -> allow turning
+      const gx = (z.x - arenaPadding) / CW;
+      const gy = (z.y - arenaPadding) / CH;
+      const fx = Math.abs(gx - Math.round(gx));
+      const fy = Math.abs(gy - Math.round(gy));
+      return fx < 0.15 && fy < 0.15;
+    }
+
+    function chooseDir(z){
+      const nd = nearestData(z.x, z.y);
+      const target = nd.target;
+      const chasing = !!target && nd.d2 < CHASE_RADIUS2;
+      const candidates = [];
+      const reverseX = -z.dirX, reverseY = -z.dirY;
+      const dirs = [ [1,0], [-1,0], [0,1], [0,-1] ];
+      for(const [dx,dy] of dirs){
+        if(dx===reverseX && dy===reverseY) continue; // avoid reversing
+        if(canMoveDir(z, dx, dy)) candidates.push([dx,dy]);
+      }
+      if(candidates.length===0){
+        // allow reversing if stuck
+        for(const [dx,dy] of dirs){ if(canMoveDir(z, dx, dy)) { candidates.push([dx,dy]); } }
+      }
+      if(candidates.length===0) return chasing; // stuck
+      // outside chase radius or no target: do not bias toward players; keep current if possible
+      if(!chasing || !target){
+        let picked = null;
+        for(const [dx,dy] of candidates){ if(dx===z.dirX && dy===z.dirY){ picked = [dx,dy]; break; } }
+        if(!picked){ picked = choice(candidates); }
+        z.dirX = picked[0]; z.dirY = picked[1];
+        return false;
+      }
+      let best = candidates[0];
+      let bestD2 = Infinity;
+      for(const [dx,dy] of candidates){
+        const tx = z.x + dx * CW; const ty = z.y + dy * CH;
+        const d2 = (target.x-tx)*(target.x-tx) + (target.y-ty)*(target.y-ty);
+        if(d2 < bestD2){ bestD2 = d2; best = [dx,dy]; }
+      }
+      // when chasing in grid mode (edge case), strongly bias best
+      z.dirX = best[0]; z.dirY = best[1];
+      return true;
+    }
+
+    for(const z of zombies){
+      if(z._dead) continue;
+      // evaluate chasing state each frame for speed adjustment
+      const ndNow = nearestData(z.x, z.y);
+      z._chasing = !!ndNow.target && ndNow.d2 < CHASE_RADIUS2;
+
+      if(z._chasing){
+        // Steering pursuit with wall-aware sampling
+        function angleDelta(a,b){ let d=b-a; while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2; return d; }
+        const desired = Math.atan2(ndNow.target.y - z.y, ndNow.target.x - z.x);
+        const maxTurnRate = 4.8; // rad/sec
+        const delta = angleDelta(z.a, desired);
+        z.a = z.a + clamp(delta, -maxTurnRate*dt, maxTurnRate*dt);
+        const speed = z.thrust * 1.25;
+        const prevX = z.x, prevY = z.y;
+        const candidates = [ z.a, z.a + 0.6, z.a - 0.6, z.a + 1.0, z.a - 1.0 ];
+        let best = { score: -Infinity, x: z.x, y: z.y, a: z.a };
+        const targetX = ndNow.target.x, targetY = ndNow.target.y;
+        for(const ca of candidates){
+          const tx = Math.cos(ca) * speed * dt;
+          const ty = Math.sin(ca) * speed * dt;
+          const fx = { x: z.x + tx, y: z.y + ty, size: z.size };
+          resolveTankCollisions(fx);
+          const moved = Math.hypot(fx.x - z.x, fx.y - z.y);
+          const afterD2 = (targetX - fx.x)*(targetX - fx.x) + (targetY - fx.y)*(targetY - fx.y);
+          const score = -afterD2 + moved * 400;
+          if(score > best.score){ best = { score, x: fx.x, y: fx.y, a: ca }; }
+        }
+        z.x = best.x; z.y = best.y; z.a = best.a;
+        // Fallback: tangent slide
+        if(Math.hypot(z.x - prevX, z.y - prevY) < 0.3){
+          const tx = -Math.sin(z.a), ty = Math.cos(z.a);
+          const fx = { x: prevX + tx * speed * dt * 0.9, y: prevY + ty * speed * dt * 0.9, size: z.size };
+          resolveTankCollisions(fx);
+          if(Math.hypot(fx.x - prevX, fx.y - prevY) > Math.hypot(z.x - prevX, z.y - prevY)){
+            z.x = fx.x; z.y = fx.y;
+          }
+        }
+      } else {
+        // Pac-Man grid movement when not chasing
+        z.decideCooldown = Math.max(0, (z.decideCooldown||0) - dt);
+        const forwardClear = canMoveDir(z, z.dirX, z.dirY);
+        if(z.decideCooldown<=0 && (atIntersection(z) || !forwardClear)){
+          const ch = chooseDir(z);
+          z.decideCooldown = ch ? 0.06 : 0.12;
+        }
+        const speed = z.thrust;
+        z.x += z.dirX * speed * dt;
+        z.y += z.dirY * speed * dt;
+        z.a = Math.atan2(z.dirY, z.dirX);
+        const fakeTank = { x: z.x, y: z.y, size: z.size };
+        resolveTankCollisions(fakeTank);
+        z.x = fakeTank.x; z.y = fakeTank.y;
+      }
+
+      // touch damage
+      z.touchTimer = Math.max(0, z.touchTimer - dt);
+      if(z.touchTimer<=0){
+        for(const p of players){
+          if(!p.alive) continue;
+          if(circleHit(z.x,z.y,z.size/2, p.x,p.y,p.size/2)){
+            p.hp = Math.max(0, p.hp - z.touchDamage);
+            p.showHpTimer = 1.0;
+            SFX.play('hit');
+            if(p.hp<=0){
+              if(p.alive){ SFX.play('tankExplode'); spawnDeathExplosion(p.x, p.y); }
+              p.alive = false;
+            }
+            z.touchTimer = z.touchCooldown; break;
+          }
+        }
+      }
+    }
+    zombies = zombies.filter(z=>!z._dead);
+  }
+
+  function tryFire(t){
+    if(t.fireTimer>0) return;
+    t.fireTimer = t.fireCd;
+
+    // Play shooting sound
+    SFX.play('shoot');
+
+    const count = Math.max(1, t.multishot);
+    console.log('Firing bullet with properties:', { 
+      damage: t.damage, 
+      maxBounces: t.maxBounces, 
+      pierce: t.pierce, 
+      multishot: t.multishot, 
+      fireCd: t.fireCd, 
+      bulletSpeed: t.bulletSpeed 
+    });
+    
+    for(let i=0;i<count;i++){
+      let sp = 0;
+      if(count > 1) {
+        // Calculate spread angle for multiple bullets
+        const totalSpread = 30; // Total spread in degrees
+        const angleStep = totalSpread / (count - 1);
+        sp = (i - (count - 1) / 2) * angleStep * Math.PI / 180;
+      }
+      const a = t.a + sp;
+      
+      // Determine bullet color based on player's perks
+      let bulletColor = '#ffffff'; // Default white
+      if(t.hasPissMissiles) {
+        bulletColor = '#ffff00'; // Bright yellow for Piss Missile
+      } else if(t.damage > 1) {
+        bulletColor = '#ff4444'; // Red for extra damage
+      } else if(t.maxBounces > 0) {
+        bulletColor = '#ffff00'; // Yellow for ricochet
+      } else if(t.pierce > 0) {
+        bulletColor = '#ff8800'; // Orange for piercing
+      } else if(t.multishot > 1) {
+        bulletColor = '#ff00ff'; // Purple for multishot
+      }
+      
+      bullets.push({
+        x: t.x + Math.cos(a)*t.size*0.7,
+        y: t.y + Math.sin(a)*t.size*0.7,
+        vx: Math.cos(a)*t.bulletSpeed,
+        vy: Math.sin(a)*t.bulletSpeed,
+        r: t.hasPissMissiles ? 3 : 5, // Smaller bullets for liquid stream effect
+        damage: t.damage,
+        maxBounces: t.maxBounces,
+        pierce: t.pierce,
+        color: bulletColor,
+        owner: t,
+        ownerTeam: (gameMode==='zombies') ? 'humans' : (t===p1 ? 'p1' : 'p2'),
+        isPissMissile: t.hasPissMissiles || false
+      });
+    }
+    if(t.recoil>0){ t.x -= Math.cos(t.a)*t.recoil; t.y -= Math.sin(t.a)*t.recoil; }
+
+    // Landmines: every 3rd shot plants a mine under the tank
+    if(t.hasLandmines){
+      t.shotCounter = (t.shotCounter||0) + 1;
+      if(t.shotCounter % 3 === 0){
+        const mine = {
+          x: t.x,
+          y: t.y,
+          r: 9,
+          owner: t,
+          armTime: 0.25,
+          armed: false,
+          triggered: false,
+          damage: Math.max(2, t.damage + 1),
+          radius: 46
+        };
+        mines.push(mine);
+      }
+    }
+  }
+
+  // ---------- collisions ----------
+  function circleHit(ax,ay,ar,bx,by,br){
+    const dx=ax-bx, dy=ay-by; return dx*dx+dy*dy <= (ar+br)*(ar+br);
+  }
+  function circleRectOverlap(cx,cy,cr, r){
+    const nx = clamp(cx, r.x, r.x+r.w);
+    const ny = clamp(cy, r.y, r.y+r.h);
+    const dx = cx - nx, dy = cy - ny;
+    const d2 = dx*dx + dy*dy;
+    if(d2 <= cr*cr) return {hit:true, dx, dy};
+    return {hit:false};
+  }
+  function resolveTankCollisions(t){
+    for(const r of walls){
+      const o = circleRectOverlap(t.x, t.y, t.size/2, r);
+      if(o.hit){
+        const len = Math.max(0.0001, Math.hypot(o.dx, o.dy));
+        const nx = o.dx/len, ny = o.dy/len;
+        const push = (t.size/2 - len) + 0.5;
+        t.x += nx * push; t.y += ny * push;
+      }
+    }
+    const minX = arenaPadding + t.size/2, maxX = arenaPadding + innerW - t.size/2;
+    const minY = arenaPadding + t.size/2, maxY = arenaPadding + innerH - t.size/2;
+    t.x = clamp(t.x, minX, maxX); t.y = clamp(t.y, minY, maxY);
+  }
+
+  // ---------- UI: draft pickers ----------
+  function uniquePicks(pool, n=3){
+    const names = new Set(), picks = [];
+    let guard = 100;
+    
+    // Rarity weights: common (65%), rare (25%), legendary (8%), mythical (2%)
+    const rarityWeights = {
+      'common': 0.65,
+      'rare': 0.25,
+      'legendary': 0.08,
+      'mythical': 0.02
+    };
+    
+    while(picks.length < n && guard-- > 0){
+      // Roll for rarity first
+      const rarityRoll = Math.random();
+      let targetRarity = 'common';
+      
+      if(rarityRoll < rarityWeights.mythical) {
+        targetRarity = 'mythical';
+      } else if(rarityRoll < rarityWeights.mythical + rarityWeights.legendary) {
+        targetRarity = 'legendary';
+      } else if(rarityRoll < rarityWeights.mythical + rarityWeights.legendary + rarityWeights.rare) {
+        targetRarity = 'rare';
+      }
+      
+      // Filter pool by target rarity
+      const rarityPool = pool.filter(upgrade => upgrade.rarity === targetRarity);
+      
+      if(rarityPool.length > 0) {
+        const cand = choice(rarityPool);
+        if(!names.has(cand.name)){ 
+          names.add(cand.name); 
+          picks.push(cand); 
+        }
+      } else {
+        // Fallback to any available perk if rarity pool is empty
+        const cand = choice(pool);
+        if(!names.has(cand.name)){ 
+          names.add(cand.name); 
+          picks.push(cand); 
+        }
+      }
+    }
+    return picks;
+  }
+  
+  function showDraft(player, title, onDone){
+    // Pause game while draft is open
+    const prevPaused = paused; paused = true;
+    // Play menu open sound
+    SFX.play('menuOpen');
+
+    const wrapper = document.createElement('div');
+    Object.assign(wrapper.style, {
+      position:'fixed', inset:'0', display:'flex', alignItems:'center', justifyContent:'center',
+      background:'rgba(0,0,0,0.8)', zIndex:'50', pointerEvents:'auto'
+    });
+
+    const panel = document.createElement('div');
+    Object.assign(panel.style, {
+      background:'#000', border:'2px solid #ffffff', padding:'20px', minWidth:'500px'
+    });
+
+    const h = document.createElement('div');
+    h.textContent = title;
+    Object.assign(h.style, { 
+      fontSize:'16px', 
+      marginBottom:'20px', 
+      textAlign:'center', 
+      color:'#ffffff',
+      fontFamily: 'Press Start 2P, monospace',
+      fontWeight: 'bold'
+    });
+    panel.appendChild(h);
+
+    const row = document.createElement('div');
+    Object.assign(row.style, { display:'flex', gap:'16px', justifyContent:'center' });
+    panel.appendChild(row);
+
+    const picks = uniquePicks(upgradePool, 3);
+    let selectedIndex = 0;
+    
+    // Get player color for highlighting
+    const playerColor = player.control === 'P1' ? '#ff69b4' : '#0080ff';
+    
+    const buttons = [];
+    for(let i = 0; i < picks.length; i++){
+      const up = picks[i];
+      
+      // Set text glow colors based on rarity (only for perk names)
+      let nameGlow = 'text-shadow: 0 0 4px #ffffff;'; // Default white glow for common
+      
+      if(up.rarity === 'rare') {
+        nameGlow = 'text-shadow: 0 0 8px #00aaff, 0 0 12px #00aaff;';
+      } else if(up.rarity === 'legendary') {
+        nameGlow = 'text-shadow: 0 0 10px #ffdd00, 0 0 15px #ffdd00, 0 0 20px #ffdd00;';
+      } else if(up.rarity === 'mythical') {
+        nameGlow = 'text-shadow: 0 0 12px #ffff00, 0 0 18px #ffff00, 0 0 24px #ffff00, 0 0 30px #ffff00;';
+      }
+      
+      const btn = document.createElement('button');
+      btn.innerHTML = `<div style="font-weight:bold;margin-bottom:8px;font-size:12px;font-family:'Press Start 2P',monospace;${nameGlow}">${up.name}</div>
+                       <div style="font-size:10px;color:#00ff88;font-family:'Press Start 2P',monospace;">${up.good}</div>
+                       <div style="font-size:10px;color:#ff4444;font-family:'Press Start 2P',monospace;">${up.bad}</div>`;
+      Object.assign(btn.style, {
+        width:'140px', padding:'12px', cursor:'pointer',
+        background:'#000', color:'#ffffff', border:'2px solid #ffffff', textAlign:'left',
+        fontFamily: 'Press Start 2P, monospace'
+      });
+      
+      if(i === selectedIndex) {
+        btn.style.border = `3px solid ${playerColor}`;
+      }
+      
+      // Add legendary animation
+      if(up.rarity === 'legendary') {
+        btn.style.animation = 'legendaryGlow 2s ease-in-out infinite alternate';
+      }
+      
+      // Add mythical animation
+      if(up.rarity === 'mythical') {
+        btn.style.animation = 'mythicalGlow 1.5s ease-in-out infinite alternate';
+      }
+      
+      btn.onclick = () => {
+        // Play menu select sound
+        SFX.play('menuSelect');
+        applyUpgrade(player, up);
+        document.body.removeChild(wrapper);
+        onDone && onDone();
+      };
+      
+      row.appendChild(btn);
+      buttons.push(btn);
+    }
+    
+    const instructions = document.createElement('div');
+    instructions.textContent = 'Use WASD/ARROWS to navigate, F// to select';
+    Object.assign(instructions.style, { 
+      textAlign:'center', 
+      marginTop:'16px', 
+      fontSize:'12px', 
+      color:'#ffffff',
+      fontFamily: 'Press Start 2P, monospace'
+    });
+    panel.appendChild(instructions);
+
+    wrapper.appendChild(panel);
+    document.body.appendChild(wrapper);
+    
+    // Keyboard controls (use non-fire keys: P1=E, P2=.)
+    let keyHandler;
+    if(player.control === 'P1') {
+      keyHandler = (e) => {
+        if(e.key === 'w' || e.key === 'W' || e.key === 'a' || e.key === 'A') {
+          buttons[selectedIndex].style.border = '2px solid #ffffff';
+          selectedIndex = (selectedIndex - 1 + picks.length) % picks.length;
+          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
+        } else if(e.key === 's' || e.key === 'S' || e.key === 'd' || e.key === 'D') {
+          buttons[selectedIndex].style.border = '2px solid #ffffff';
+          selectedIndex = (selectedIndex + 1) % picks.length;
+          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
+        } else if(e.key === 'e' || e.key === 'E') {
+          // Play menu select sound
+          SFX.play('menuSelect');
+          const selectedUpgrade = picks[selectedIndex];
+          applyUpgrade(player, selectedUpgrade);
+          document.body.removeChild(wrapper);
+          window.removeEventListener('keydown', keyHandler);
+          onDone && onDone();
+        }
+      };
+    } else {
+      keyHandler = (e) => {
+        if(e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+          buttons[selectedIndex].style.border = '2px solid #ffffff';
+          selectedIndex = (selectedIndex - 1 + picks.length) % picks.length;
+          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
+        } else if(e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+          buttons[selectedIndex].style.border = '2px solid #ffffff';
+          selectedIndex = (selectedIndex + 1) % picks.length;
+          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
+        } else if(e.key === '.' || e.key === '>') {
+          // Play menu select sound
+          SFX.play('menuSelect');
+          const selectedUpgrade = picks[selectedIndex];
+          applyUpgrade(player, selectedUpgrade);
+          document.body.removeChild(wrapper);
+          window.removeEventListener('keydown', keyHandler);
+          onDone && onDone();
+        }
+      };
+    }
+    
+    window.addEventListener('keydown', keyHandler);
+
+    // Controller navigation for draft (D-pad/left-stick to move, X(2) to select)
+    const playerKey = (player===p1) ? 'p1' : 'p2';
+    let gpActive = true;
+    let prev = { left:false, right:false, up:false, down:false, select:false, axisX:0 };
+    function pollDraftGp(){
+      if(!gpActive) return;
+      pollGamepads();
+      const idx = gpIndex[playerKey];
+      const gp = idx!=null ? gamepads[idx] : null;
+      if(gp){
+        const left = !!(gp.buttons[14] && gp.buttons[14].pressed);
+        const right = !!(gp.buttons[15] && gp.buttons[15].pressed);
+        const up = !!(gp.buttons[12] && gp.buttons[12].pressed);
+        const down = !!(gp.buttons[13] && gp.buttons[13].pressed);
+        const ax = applyDeadzone(gp.axes[0] || 0);
+        const select = !!(gp.buttons[2] && gp.buttons[2].pressed); // X on Xbox, Square on PS
+        const leftEdge = (!prev.left && left) || (prev.axisX >= 0.5 && ax <= -0.5) || (!prev.up && up);
+        const rightEdge = (!prev.right && right) || (prev.axisX <= -0.5 && ax >= 0.5) || (!prev.down && down);
+        if(leftEdge){
+          buttons[selectedIndex].style.border = '2px solid #ffffff';
+          selectedIndex = (selectedIndex - 1 + picks.length) % picks.length;
+          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
+        } else if(rightEdge){
+          buttons[selectedIndex].style.border = '2px solid #ffffff';
+          selectedIndex = (selectedIndex + 1) % picks.length;
+          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
+        }
+        if(!prev.select && select){
+          SFX.play('menuSelect');
+          const selectedUpgrade = picks[selectedIndex];
+          applyUpgrade(player, selectedUpgrade);
+          gpActive = false;
+          try { window.removeEventListener('keydown', keyHandler); } catch(_e){}
+          try { document.body.removeChild(wrapper); } catch(_e){}
+          onDone && onDone();
+          return;
+        }
+        prev = { left, right, up, down, select, axisX: ax };
+      }
+      requestAnimationFrame(pollDraftGp);
+    }
+    requestAnimationFrame(pollDraftGp);
+ 
+    const originalRemoveChild = document.body.removeChild;
+    document.body.removeChild = function(node) {
+      if(node === wrapper) {
+        window.removeEventListener('keydown', keyHandler);
+        gpActive = false;
+        paused = prevPaused; // resume game
+        document.body.removeChild = originalRemoveChild;
+      }
+      return originalRemoveChild.call(this, node);
+    };
+  }
+  
+  function openLoserChoice(loser){
+    showDraft(loser, `Player ${loser===p1?1:2} — choose an upgrade`, ()=>{
+      resetRound();
+      state = 'round';
+    });
+  }
+  
+  function startMatchDraft(){
+    state = 'start_p1';
+    showDraft(p1, 'Player 1 — choose an upgrade', ()=>{
+      state = 'start_p2';
+      showDraft(p2, 'Player 2 — choose an upgrade', ()=>{
+        resetRound();
+        state = 'round';
+      });
+    });
+  }
+
+  // ----- control selection screen -----
+  function showControlSelection() {
+    // Play menu open sound
+    SFX.play('menuOpen');
+    
+    const wrapper = document.createElement('div');
+    wrapper.id = 'controlSelection';
+    Object.assign(wrapper.style, {
+      position:'fixed', inset:'0', display:'flex', alignItems:'center', justifyContent:'center',
+      background:'rgba(0,0,0,0.9)', zIndex:'200', pointerEvents:'auto'
+    });
+
+    const panel = document.createElement('div');
+    Object.assign(panel.style, {
+      background:'#000', border:'2px solid #ffffff', padding:'32px', minWidth:'600px'
+    });
+
+    const header = document.createElement('div');
+    header.innerHTML = '<h1 style="margin:0 0 30px 0;color:#ffffff;text-align:center;font-size:24px;">CONTROL SELECTION</h1>';
+    panel.appendChild(header);
+
+    // Player 1 Controls
+    const p1Section = createPlayerControlSection('p1', 'Player 1 (Pink)', '#ff69b4');
+    panel.appendChild(p1Section);
+
+    // Player 2 Controls
+    const p2Section = createPlayerControlSection('p2', 'Player 2 (Blue)', '#0080ff');
+    panel.appendChild(p2Section);
+
+    // Start Game Button
+    const startBtn = document.createElement('button');
+    startBtn.textContent = 'START GAME';
+    startBtn.style.cssText = 'width:100%;margin:20px 0;padding:16px;background:#ffffff;color:#000;border:none;cursor:pointer;font-weight:800;font-size:18px;font-family:Press Start 2P,monospace;';
+    startBtn.id = 'startGameBtn';
+    startBtn.onclick = () => {
+      // Play menu select sound
+      SFX.play('menuSelect');
+      document.body.removeChild(wrapper);
+      if(gameMode === 'versus'){
+        state = 'start_p1';
+        startMatchDraft();
+      } else {
+        startZombies();
+      }
+    };
+    panel.appendChild(startBtn);
+
+    wrapper.appendChild(panel);
+    document.body.appendChild(wrapper);
+
+    // Controller navigation for control selection screen
+    let focusIds = ['p1Keyboard','p1Controller','p2Keyboard','p2Controller','startGameBtn'];
+    let focusIndex = 4; // default to Start Game
+    function setFocus(idx){
+      const prevEl = document.getElementById(focusIds[focusIndex]);
+      if(prevEl){ prevEl.style.outline = 'none'; prevEl.style.boxShadow = 'none'; }
+      focusIndex = (idx + focusIds.length) % focusIds.length;
+      const el = document.getElementById(focusIds[focusIndex]);
+      if(el){ el.style.outline = '3px solid #ffff00'; el.style.boxShadow = '0 0 8px #ffff00'; }
+    }
+    setFocus(focusIndex);
+
+    let csActive = true;
+    let prev = { up:false, down:false, select:false, ax:0, ay:0 };
+    function pollControlGp(){
+      if(!csActive) return;
+      pollGamepads();
+      // Use first available connected gp
+      let gp = null;
+      const list = navigator.getGamepads ? navigator.getGamepads() : [];
+      for(let i=0;i<list.length;i++){ if(list[i]){ gp = list[i]; break; } }
+      if(gp){
+        const up = !!(gp.buttons[12] && gp.buttons[12].pressed);
+        const down = !!(gp.buttons[13] && gp.buttons[13].pressed);
+        const ax = applyDeadzone(gp.axes[0] || 0);
+        const ay = applyDeadzone(gp.axes[1] || 0);
+        const select = !!(gp.buttons[0] && gp.buttons[0].pressed) || !!(gp.buttons[7] && gp.buttons[7].pressed) || !!(gp.buttons[6] && gp.buttons[6].pressed);
+        const upEdge = (!prev.up && up) || (prev.ay >= 0.5 && ay <= -0.5);
+        const downEdge = (!prev.down && down) || (prev.ay <= -0.5 && ay >= 0.5);
+        if(upEdge){ setFocus(focusIndex - 1); }
+        if(downEdge){ setFocus(focusIndex + 1); }
+        if(!prev.select && select){
+          const el = document.getElementById(focusIds[focusIndex]);
+          if(el){ el.click(); }
+        }
+        prev = { up, down, select, ax, ay };
+      }
+      requestAnimationFrame(pollControlGp);
+    }
+    requestAnimationFrame(pollControlGp);
+
+    const originalRemoveChild = document.body.removeChild;
+    document.body.removeChild = function(node){
+      if(node === wrapper){
+        csActive = false;
+        document.body.removeChild = originalRemoveChild;
+      }
+      return originalRemoveChild.call(this, node);
+    };
+  }
+
+  // ----- mode selection screen -----
+  function showModeSelection(){
+    SFX.play('menuOpen');
+    SFX.playMusic('background'); // Start background music
+
+    const wrapper = document.createElement('div');
+    Object.assign(wrapper.style, {
+      position:'fixed', inset:'0', display:'flex', alignItems:'center', justifyContent:'center',
+      background:'rgba(0,0,0,0.9)', zIndex:'300', pointerEvents:'auto'
+    });
+
+    const panel = document.createElement('div');
+    Object.assign(panel.style, {
+      background:'#000', border:'2px solid #ffffff', padding:'28px', minWidth:'520px'
+    });
+
+    const header = document.createElement('div');
+    header.innerHTML = '<h1 style="margin:0 0 24px 0;color:#ffffff;text-align:center;font-size:22px;">SELECT MODE</h1>';
+    panel.appendChild(header);
+
+    const row = document.createElement('div');
+    Object.assign(row.style, { display:'flex', gap:'16px', justifyContent:'center' });
+
+    function makeBtn(label, desc, onClick){
+      const btn = document.createElement('button');
+      btn.innerHTML = `<div style="font-weight:bold;margin-bottom:6px;font-size:14px;font-family:'Press Start 2P',monospace;">${label}</div>
+                       <div style="font-size:10px;color:#ccc;font-family:'Press Start 2P',monospace;max-width:220px;">${desc}</div>`;
+      Object.assign(btn.style, {
+        width:'240px', padding:'16px', cursor:'pointer',
+        background:'#000', color:'#ffffff', border:'2px solid #ffffff', textAlign:'left',
+        fontFamily: 'Press Start 2P, monospace'
+      });
+      btn.onmouseenter = ()=> SFX.play('menuOpen');
+      btn.onclick = ()=>{ SFX.play('menuSelect'); onClick && onClick(); };
+      return btn;
+    }
+
+    const versusBtn = makeBtn('VERSUS', 'P1 vs P2 with upgrades. First to 5 wins.', ()=>{
+      gameMode = 'versus';
+      document.body.removeChild(wrapper);
+      showControlSelection();
+    });
+    const zombiesBtn = makeBtn('ZOMBIES CO-OP', 'Team up to survive waves of bots.', ()=>{
+      gameMode = 'zombies';
+      document.body.removeChild(wrapper);
+      showControlSelection();
+    });
+    row.appendChild(versusBtn);
+    row.appendChild(zombiesBtn);
+    panel.appendChild(row);
+
+    wrapper.appendChild(panel);
+    document.body.appendChild(wrapper);
+  }
+
+  function createPlayerControlSection(player, title, color) {
+    const section = document.createElement('div');
+    section.style.marginBottom = '30px';
+    section.style.padding = '20px';
+    section.style.background = '#111';
+    section.style.border = `2px solid ${color}`;
+
+    const sectionTitle = document.createElement('h3');
+    sectionTitle.textContent = title;
+    sectionTitle.style.color = color;
+    sectionTitle.style.margin = '0 0 20px 0';
+    sectionTitle.style.fontSize = '16px';
+    section.appendChild(sectionTitle);
+
+    // Input Type Selection
+    const typeSelect = document.createElement('div');
+    typeSelect.style.marginBottom = '20px';
+    typeSelect.innerHTML = `
+      <label style="color:#ffffff;margin-right:12px;font-weight:600;display:block;margin-bottom:10px;">Input Type:</label>
+    `;
+    
+    // Create button container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.gap = '10px';
+    
+    // Keyboard Button
+    const keyboardBtn = document.createElement('button');
+    keyboardBtn.textContent = 'KEYBOARD';
+    keyboardBtn.id = `${player}Keyboard`;
+    keyboardBtn.style.cssText = `
+      background: ${controlConfig[player].type === 'keyboard' ? '#ffffff' : '#000'};
+      color: ${controlConfig[player].type === 'keyboard' ? '#000' : '#ffffff'};
+      border: 2px solid #ffffff;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      font-weight: bold;
+      min-width: 120px;
+      transition: all 0.2s ease;
+    `;
+    
+    // Controller Button
+    const controllerBtn = document.createElement('button');
+    controllerBtn.textContent = 'CONTROLLER';
+    controllerBtn.id = `${player}Controller`;
+    controllerBtn.style.cssText = `
+      background: ${controlConfig[player].type === 'controller' ? '#ffffff' : '#000'};
+      color: ${controlConfig[player].type === 'controller' ? '#000' : '#ffffff'};
+      border: 2px solid #ffffff;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      font-weight: bold;
+      min-width: 120px;
+      transition: all 0.2s ease;
+    `;
+    
+    // Button click handlers
+    keyboardBtn.onclick = () => {
+      controlConfig[player].type = 'keyboard';
+      updateButtonStyles(player);
+      updateControlDisplay(player);
+    };
+    
+    controllerBtn.onclick = () => {
+      controlConfig[player].type = 'controller';
+      updateButtonStyles(player);
+      assignGamepadTo(player);
+      updateControlDisplay(player);
+    };
+    
+    buttonContainer.appendChild(keyboardBtn);
+    buttonContainer.appendChild(controllerBtn);
+    typeSelect.appendChild(buttonContainer);
+    section.appendChild(typeSelect);
+
+    // Control Display
+    const controlDisplay = document.createElement('div');
+    controlDisplay.id = `${player}Controls`;
+    controlDisplay.style.background = '#000';
+    controlDisplay.style.padding = '16px';
+    controlDisplay.style.border = '1px solid #333';
+    controlDisplay.style.fontSize = '10px';
+    controlDisplay.style.color = '#ffffff';
+    
+    updateControlDisplay(player);
+    section.appendChild(controlDisplay);
+
+    return section;
+  }
+
+  function updateControlDisplay(player) {
+    const display = document.getElementById(`${player}Controls`);
+    if(!display) return;
+
+    const config = controlConfig[player];
+    let html = '';
+
+    if(config.type === 'keyboard') {
+      html = `
+        <strong style="color:#00ff88;">Keyboard Controls:</strong><br>
+        Move: ${config.controls.up.toUpperCase()}/${config.controls.down.toUpperCase()}<br>
+        Rotate: ${config.controls.left.toUpperCase()}/${config.controls.right.toUpperCase()}<br>
+        Fire: ${config.controls.fire.toUpperCase()}
+      `;
+    } else {
+      const idx = gpIndex[player];
+      const status = idx==null ? '<span style="color:#ff4444">Waiting for controller... Press any button</span>' : `Gamepad #${idx}`;
+      html = `
+        <strong style=\"color:#00ff88;\">Controller Controls:</strong><br>
+        ${status}<br>
+        Left Stick: Movement<br>
+        Right Stick: Rotation<br>
+        Fire: ${controllerMapping[player].fire}
+      `;
+    }
+    display.innerHTML = html;
+  }
+
+  function updateButtonStyles(player) {
+    const keyboardBtn = document.getElementById(`${player}Keyboard`);
+    const controllerBtn = document.getElementById(`${player}Controller`);
+    
+    if (keyboardBtn && controllerBtn) {
+      // Reset both buttons
+      keyboardBtn.style.background = '#000';
+      keyboardBtn.style.color = '#ffffff';
+      controllerBtn.style.background = '#000';
+      controllerBtn.style.color = '#ffffff';
+      
+      // Highlight active button
+      if (controlConfig[player].type === 'keyboard') {
+        keyboardBtn.style.background = '#ffffff';
+        keyboardBtn.style.color = '#000';
+      } else {
+        controllerBtn.style.background = '#ffffff';
+        controllerBtn.style.color = '#000';
+      }
+    }
+  }
+
+  // Control configuration
+  let controlConfig = {
+    p1: { type: 'keyboard', controls: { up: 'w', down: 's', left: 'a', right: 'd', fire: 'f' } },
+    p2: { type: 'keyboard', controls: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', fire: '/' } }
+  };
+  
+  // Controller mapping
+  let controllerMapping = {
+    p1: { leftStick: 'move', rightStick: 'rotate', fire: 'RT' },
+    p2: { leftStick: 'move', rightStick: 'rotate', fire: 'LT' }
+  };
+
+  // ---------- controllers (Gamepad API) ----------
+  const DEADZONE = 0.2;
+  let gpIndex = { p1: null, p2: null };
+  let gamepads = {};
+
+  function applyDeadzone(v){ return Math.abs(v) < DEADZONE ? 0 : v; }
+
+  function pollGamepads(){
+    const list = navigator.getGamepads ? navigator.getGamepads() : [];
+    gamepads = {};
+    for(let i=0;i<list.length;i++){
+      const gp = list[i];
+      if(gp) gamepads[gp.index] = gp;
+    }
+  }
+
+  function findAvailableGamepad(excludeIdx = []){
+    const list = navigator.getGamepads ? navigator.getGamepads() : [];
+    for(let i=0;i<list.length;i++){
+      const gp = list[i];
+      if(gp && excludeIdx.indexOf(gp.index) === -1) return gp.index;
+    }
+    return null;
+  }
+
+  function assignGamepadTo(playerKey){
+    const other = playerKey === 'p1' ? 'p2' : 'p1';
+    const idx = findAvailableGamepad([gpIndex[other]]);
+    gpIndex[playerKey] = idx;
+    updateControlDisplay(playerKey);
+  }
+
+  // ---------- dev console commands ----------
+  function parseArgs(tokens){
+    const obj = {}; for(const t of tokens){ const [k,v] = t.split('='); if(k){ obj[k] = v; } } return obj;
+  }
+  function getPlayerFromArg(arg){
+    if(!arg) return null; const v = String(arg).toLowerCase(); if(v==='p1'||v==='1'||v==='player1') return p1; if(v==='p2'||v==='2'||v==='player2') return p2; return null;
+  }
+  function cmdHelp(){
+    logDev('Commands:');
+    logDev(' help');
+    logDev(' mute | unmute');
+    logDev(' setscore p=1|2 v=0..N');
+    logDev(' winround p=1|2');
+    logDev(' winmatch p=1|2');
+    logDev(' kill p=1|2');
+    logDev(' sethp p=1|2 v=N');
+    logDev(' setmaxhp p=1|2 v=N');
+    logDev(' resetround');
+    logDev(' resetmatch');
+  }
+  function submitDevCommand(line){
+    if(!line) return; const parts = line.trim().split(/\s+/); const cmd = (parts.shift()||'').toLowerCase(); const args = parseArgs(parts);
+    switch(cmd){
+      case 'help': cmdHelp(); break;
+      case 'mute': SFX.setMuted(true); logDev('Muted'); break;
+      case 'unmute': SFX.setMuted(false); logDev('Unmuted'); break;
+      case 'setscore': {
+        const t = getPlayerFromArg(args.p); const v = Number(args.v);
+        if(!t || !Number.isFinite(v)){ logDev('Usage: setscore p=1|2 v=N'); break; }
+        t.score = Math.max(0, Math.floor(v)); refreshScores(); logDev(`Score set: ${t===p1?'P1':'P2'}=${t.score}`);
+      } break;
+      case 'winround': {
+        const t = getPlayerFromArg(args.p); if(!t){ logDev('Usage: winround p=1|2'); break; }
+        t.score++; refreshScores(); logDev(`${t===p1?'P1':'P2'} wins round (forced)`);
+      } break;
+      case 'winmatch': {
+        const t = getPlayerFromArg(args.p); if(!t){ logDev('Usage: winmatch p=1|2'); break; }
+        t.score = ROUND_WINS; refreshScores(); state='over'; setTimeout(()=>{ showWinOverlay(t); }, 100); logDev(`${t===p1?'P1':'P2'} wins match (forced)`);
+      } break;
+      case 'kill': {
+        const t = getPlayerFromArg(args.p); if(!t){ logDev('Usage: kill p=1|2'); break; }
+        t.hp = 0; t.alive = false; logDev(`${t===p1?'P1':'P2'} killed`);
+      } break;
+      case 'sethp': {
+        const t = getPlayerFromArg(args.p); const v = Number(args.v);
+        if(!t || !Number.isFinite(v)){ logDev('Usage: sethp p=1|2 v=N'); break; }
+        t.hp = clamp(Math.floor(v), 0, t.maxHp); t.showHpTimer = 1.0; logDev(`${t===p1?'P1':'P2'} hp=${t.hp}`);
+      } break;
+      case 'setmaxhp': {
+        const t = getPlayerFromArg(args.p); const v = Number(args.v);
+        if(!t || !Number.isFinite(v)){ logDev('Usage: setmaxhp p=1|2 v=N'); break; }
+        t.maxHp = Math.max(1, Math.floor(v)); t.hp = Math.min(t.hp, t.maxHp); logDev(`${t===p1?'P1':'P2'} maxHp=${t.maxHp}`);
+      } break;
+      case 'resetround': resetRound(); logDev('Round reset'); break;
+      case 'resetmatch': resetMatch(); logDev('Match reset'); break;
+      default: logDev(`Unknown: ${cmd}`); cmdHelp(); break;
+    }
+  }
+  // Build Dev Menu
+  function buildDevMenu(){
+    if(!devMenuPanel) return;
+    devMenuPanel.innerHTML = '';
+    const title = document.createElement('div');
+    title.textContent = 'DEV MENU';
+    title.style.cssText = 'color:#ffffff;font-family:Press Start 2P,monospace;font-size:16px;text-align:center;margin-bottom:14px;';
+    devMenuPanel.appendChild(title);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'CLOSE';
+    closeBtn.className = 'devBtn';
+    closeBtn.style.float = 'right';
+    closeBtn.onclick = ()=>{ devMenu.style.display='none'; };
+    devMenuPanel.appendChild(closeBtn);
+
+    // Perk quick-add rows
+    const perkHeader = document.createElement('div');
+    perkHeader.textContent = 'Perks';
+    perkHeader.style.cssText = 'color:#ffffff;font-family:Press Start 2P,monospace;font-size:12px;margin:10px 0 6px 0;';
+    devMenuPanel.appendChild(perkHeader);
+
+    for(const up of upgradePool){
+      const row = document.createElement('div'); row.className = 'devRow';
+      const name = document.createElement('div'); name.className = 'devPerkName'; name.textContent = up.name;
+      const left = document.createElement('div'); left.appendChild(name);
+      const actions = document.createElement('div');
+      const p1Btn = document.createElement('button'); p1Btn.className = 'devBtn'; p1Btn.textContent = 'Give to P1'; p1Btn.onclick = ()=>{ applyUpgrade(p1, up); };
+      const p2Btn = document.createElement('button'); p2Btn.className = 'devBtn'; p2Btn.textContent = 'Give to P2'; p2Btn.onclick = ()=>{ applyUpgrade(p2, up); };
+      actions.appendChild(p1Btn); actions.appendChild(p2Btn);
+      row.appendChild(left); row.appendChild(actions);
+      devMenuPanel.appendChild(row);
+    }
+
+    // Music controls
+    const musicHeader = document.createElement('div');
+    musicHeader.textContent = 'Music';
+    musicHeader.style.cssText = 'color:#ffffff;font-family:Press Start 2P,monospace;font-size:12px;margin:14px 0 6px 0;';
+    devMenuPanel.appendChild(musicHeader);
+
+    const musicRow = document.createElement('div'); musicRow.className = 'devRow';
+    const musicToggle = document.createElement('button'); musicToggle.className = 'devBtn'; musicToggle.textContent = 'Toggle Music'; musicToggle.onclick = ()=>{ SFX.toggleMusicMute(); };
+    const musicVolSlider = document.createElement('input'); musicVolSlider.type = 'range'; musicVolSlider.min = '0'; musicVolSlider.max = '100'; musicVolSlider.value = '40'; musicVolSlider.style.width = '150px';
+    musicVolSlider.oninput = (e) => { SFX.setMusicVolume(e.target.value / 100); };
+    const musicVolLabel = document.createElement('span'); musicVolLabel.textContent = 'Vol: 40%'; musicVolLabel.style.color = '#ffffff'; musicVolLabel.style.fontSize = '10px';
+    musicVolSlider.oninput = (e) => { const vol = e.target.value / 100; SFX.setMusicVolume(vol); musicVolLabel.textContent = `Vol: ${Math.round(vol * 100)}%`; };
+    musicRow.appendChild(musicToggle); musicRow.appendChild(musicVolSlider); musicRow.appendChild(musicVolLabel);
+    devMenuPanel.appendChild(musicRow);
+
+    // Match controls
+    const matchHeader = document.createElement('div');
+    matchHeader.textContent = 'Match';
+    matchHeader.style.cssText = 'color:#ffffff;font-family:Press Start 2P,monospace;font-size:12px;margin:14px 0 6px 0;';
+    devMenuPanel.appendChild(matchHeader);
+
+    const matchRow = document.createElement('div'); matchRow.className = 'devRow';
+    const startVersus = document.createElement('button'); startVersus.className = 'devBtn'; startVersus.textContent = 'Start Versus'; startVersus.onclick = ()=>{ gameMode='versus'; resetMatch(); };
+    const startZ = document.createElement('button'); startZ.className = 'devBtn'; startZ.textContent = 'Start Zombies'; startZ.onclick = ()=>{ gameMode='zombies'; startZombies(); };
+    const resetBtn = document.createElement('button'); resetBtn.className = 'devBtn'; resetBtn.textContent = 'Reset Round'; resetBtn.onclick = ()=>{ if(gameMode==='versus'){ resetRound(); } else { startZombies(); } };
+    matchRow.appendChild(startVersus); matchRow.appendChild(startZ); matchRow.appendChild(resetBtn);
+    devMenuPanel.appendChild(matchRow);
+
+    // Player tweaks
+    const tweaksHeader = document.createElement('div');
+    tweaksHeader.textContent = 'Tweaks';
+    tweaksHeader.style.cssText = 'color:#ffffff;font-family:Press Start 2P,monospace;font-size:12px;margin:14px 0 6px 0;';
+    devMenuPanel.appendChild(tweaksHeader);
+
+    const healRow = document.createElement('div'); healRow.className = 'devRow';
+    const healP1 = document.createElement('button'); healP1.className = 'devBtn'; healP1.textContent = 'Heal P1'; healP1.onclick = ()=>{ p1.hp=p1.maxHp; p1.showHpTimer=1.0; };
+    const healP2 = document.createElement('button'); healP2.className = 'devBtn'; healP2.textContent = 'Heal P2'; healP2.onclick = ()=>{ p2.hp=p2.maxHp; p2.showHpTimer=1.0; };
+    healRow.appendChild(healP1); healRow.appendChild(healP2);
+    devMenuPanel.appendChild(healRow);
+
+    if(gameMode==='zombies'){
+      const zRow = document.createElement('div'); zRow.className = 'devRow';
+      const addKillsP1 = document.createElement('button'); addKillsP1.className='devBtn'; addKillsP1.textContent = '+5 Kills P1'; addKillsP1.onclick=()=>{ p1.zKills=(p1.zKills||0)+5; refreshKills(); };
+      const addKillsP2 = document.createElement('button'); addKillsP2.className='devBtn'; addKillsP2.textContent = '+5 Kills P2'; addKillsP2.onclick=()=>{ p2.zKills=(p2.zKills||0)+5; refreshKills(); };
+      zRow.appendChild(addKillsP1); zRow.appendChild(addKillsP2);
+      devMenuPanel.appendChild(zRow);
+    }
+  }
+
+  if(devMenuBtn && devMenu){
+    devMenuBtn.onclick = ()=>{ buildDevMenu(); devMenu.style.display='flex'; };
+    devMenu.onclick = (e)=>{ if(e.target === devMenu){ devMenu.style.display='none'; } };
+  }
+
+  window.addEventListener('gamepadconnected', ()=>{
+    if(gpIndex.p1 == null && controlConfig.p1.type === 'controller') assignGamepadTo('p1');
+    if(gpIndex.p2 == null && controlConfig.p2.type === 'controller') assignGamepadTo('p2');
+  });
+  window.addEventListener('gamepaddisconnected', (e)=>{
+    if(gpIndex.p1 === e.gamepad.index) gpIndex.p1 = null;
+    if(gpIndex.p2 === e.gamepad.index) gpIndex.p2 = null;
+    updateControlDisplay('p1'); updateControlDisplay('p2');
+  });
+
+  // ---------- draw ----------
+  function draw(){
+    if(screenShake > 0) {
+      const shakeX = (Math.random() - 0.5) * screenShake * 20;
+      const shakeY = (Math.random() - 0.5) * screenShake * 20;
+      ctx.save();
+      ctx.translate(shakeX, shakeY);
+    }
+    let zoomApplied = false;
+    if(deathAnim.active){
+      const p = Math.min(1, deathAnim.t / Math.max(0.0001, deathAnim.duration));
+      const ease = 1 - Math.pow(1 - p, 3);
+      const zoom = 1 + 0.12 * ease;
+      ctx.save();
+      ctx.translate(deathAnim.x, deathAnim.y);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-deathAnim.x, -deathAnim.y);
+      zoomApplied = true;
+    }
+    
+    // Clean black background
+    ctx.fillStyle='#000000';
+    ctx.fillRect(0,0,W,H);
+    
+    // Simple arena border with enhanced glow
+    ctx.strokeStyle='#00ff41';
+    ctx.lineWidth=2;
+    ctx.shadowColor = '#00ff41';
+    ctx.shadowBlur = 8;
+    ctx.strokeRect(arenaPadding,arenaPadding,innerW,innerH);
+    ctx.shadowBlur = 0;
+
+    // Simple walls with enhanced glow
+    ctx.fillStyle = '#ffa500';
+    ctx.shadowColor = '#ffa500';
+    ctx.shadowBlur = 6;
+    for(const r of walls){ 
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    }
+    ctx.shadowBlur = 0;
+
+    // Simple bullets with color modifiers
+    for(const b of bullets){ 
+      // Use the bullet's stored color (set when created based on perks)
+      const bulletColor = b.color;
+      const glowColor = b.color;
+      
+      if(b.isPissMissile) {
+        // Piss Missile bullets with intense liquid glow
+        ctx.shadowColor = '#ffff00';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = bulletColor;
+        ctx.beginPath(); 
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); 
+        ctx.fill();
+        
+        // Intense liquid glow layers
+        ctx.shadowBlur = 20;
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r + 3, 0, Math.PI*2);
+        ctx.fill();
+        
+        ctx.shadowBlur = 15;
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r + 6, 0, Math.PI*2);
+        ctx.fill();
+        
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+      } else if(b.damage > 1) {
+        // High damage bullets with moderate glow
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = bulletColor;
+        ctx.beginPath(); 
+        ctx.arc(b.x, b.y, b.r + (b.damage - 1) * 2, 0, Math.PI*2); 
+        ctx.fill();
+        
+        // Subtle additional glow layer
+        ctx.shadowBlur = 15;
+        ctx.globalAlpha = 0.4;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r + (b.damage - 1) * 2 + 2, 0, Math.PI*2);
+        ctx.fill();
+        
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+      } else {
+        // Normal bullets with moderate glow
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = bulletColor; 
+        ctx.beginPath(); 
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); 
+        ctx.fill();
+        
+        // Subtle additional glow layer
+        ctx.shadowBlur = 12;
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r + 2, 0, Math.PI*2);
+        ctx.fill();
+        
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    // Render mines
+    if(mines && mines.length){
+      for(const m of mines){
+        if(m._dead) continue;
+        ctx.save();
+        ctx.shadowColor = m.armed ? '#ff2200' : '#ffaa00';
+        ctx.shadowBlur = m.armed ? 10 : 6;
+        ctx.fillStyle = m.armed ? '#ff2200' : '#ffaa00';
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, m.r, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+    }
+
+    // Render motion trails for CRT effect with subtle glow
+    for(const trail of motionTrails){
+      if(trail.life > 0){
+        ctx.save();
+        ctx.translate(trail.x, trail.y);
+        ctx.rotate(trail.angle);
+        
+        // Subtle glow layers for authentic CRT phosphor effect
+        ctx.globalAlpha = trail.alpha * 0.15;
+        ctx.fillStyle = trail.color;
+        ctx.shadowColor = trail.color;
+        ctx.shadowBlur = 8;
+        ctx.fillRect(-trail.size/2, -trail.size/2, trail.size, trail.size);
+        
+        ctx.globalAlpha = trail.alpha * 0.4;
+        ctx.shadowBlur = 4;
+        ctx.fillRect(-trail.size/2 + 1, -trail.size/2 + 1, trail.size - 2, trail.size - 2);
+        
+        ctx.globalAlpha = trail.alpha;
+        ctx.shadowBlur = 2;
+        ctx.fillRect(-trail.size/2 + 2, -trail.size/2 + 2, trail.size - 4, trail.size - 4);
+        
+        ctx.restore();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // Zombies (render under tanks)
+    if(gameMode === 'zombies'){
+      for(const z of zombies){
+        if(z._dead) continue;
+        // Zombie body
+        ctx.save();
+        ctx.translate(z.x, z.y);
+        ctx.rotate(z.a || 0);
+        ctx.shadowColor = '#7CFC00';
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = '#7CFC00';
+        ctx.fillRect(-z.size/2, -z.size/2, z.size, z.size);
+        ctx.shadowBlur = 0;
+        ctx.restore();
+        // Zombie health bar
+        if(z.hp < z.maxHp){
+          ctx.fillStyle='#000';
+          ctx.fillRect(z.x-14, z.y-z.size/2-10, 28, 5);
+          ctx.fillStyle='#7CFC00';
+          ctx.fillRect(z.x-14, z.y-z.size/2-10, 28*(z.hp/Math.max(1,z.maxHp)), 5);
+        }
+      }
+    }
+
+    // Boss render and top health bar
+    if(gameMode === 'zombies' && bossActive && boss && !boss._dead){
+      // Boss body
+      ctx.save();
+      ctx.translate(boss.x, boss.y);
+      ctx.rotate(boss.a || 0);
+      ctx.shadowColor = '#ff00aa';
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#ff00aa';
+      ctx.fillRect(-boss.size/2, -boss.size/2, boss.size, boss.size);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+      // Boss top health bar
+      const barW = Math.min(W - 200, 600);
+      const barX = (W - barW) / 2;
+      const barY = 24;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(barX, barY, barW, 10);
+      const ratio = boss.hp / Math.max(1, boss.maxHp);
+      ctx.fillStyle = '#ff00aa';
+      ctx.fillRect(barX, barY, barW * ratio, 10);
+    }
+
+    // Simple tanks with balanced CRT glow
+    for(const t of players){
+      if(!t.alive) continue;
+      
+      ctx.save(); 
+      ctx.translate(t.x,t.y); 
+      ctx.rotate(t.a);
+      
+      // Tank glow effect - more subtle
+      ctx.shadowColor = t.color;
+      ctx.shadowBlur = 6;
+      
+      // Main tank body with glow
+      ctx.fillStyle = t.color;
+      ctx.fillRect(-t.size/2, -t.size/2, t.size, t.size);
+      
+      // Subtle additional glow layer
+      ctx.shadowBlur = 10;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(-t.size/2 - 1, -t.size/2 - 1, t.size + 2, t.size + 2);
+      
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      
+      // Simple cannon with subtle glow
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 3;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, -4, t.size/2+8, 8);
+      
+      ctx.restore();
+      
+      // Simple health bar
+      if(t.showHpTimer>0){
+        ctx.fillStyle='#000';
+        ctx.fillRect(t.x-20, t.y-t.size/2-14, 40, 6);
+        ctx.fillStyle='#00ff41';
+        ctx.fillRect(t.x-20, t.y-t.size/2-14, 40*(t.hp/t.maxHp), 6);
+      }
+      
+      // Simple damage indicator with subtle glow
+      if(t.damage > 1) {
+        ctx.save();
+        ctx.font = 'bold 12px "Press Start 2P"';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = '#ff0000';
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = '#ff0000';
+        ctx.fillText(`${t.damage}`, t.x, t.y - t.size/2 - 25);
+        ctx.restore();
+      }
+    }
+
+    // Particles for death animation
+    if(particles && particles.length){
+      for(const pr of particles){
+        const lifeRatio = pr.life / pr.maxLife;
+        if(pr.type === 'ring'){
+          ctx.save();
+          ctx.strokeStyle = pr.color;
+          ctx.globalAlpha = lifeRatio;
+          ctx.lineWidth = pr.lineWidth;
+          ctx.beginPath();
+          ctx.arc(pr.x, pr.y, pr.r, 0, Math.PI*2);
+          ctx.stroke();
+          ctx.restore();
+        } else if(pr.type === 'spark'){
+          ctx.save();
+          ctx.globalAlpha = lifeRatio;
+          ctx.fillStyle = pr.color;
+          ctx.fillRect(pr.x, pr.y, pr.size, pr.size);
+          ctx.restore();
+        } else if(pr.type === 'flash'){
+          ctx.save();
+          ctx.globalAlpha = lifeRatio * 0.7;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0,0,W,H);
+          ctx.restore();
+        }
+      }
+    }
+
+    // Red vignette during death animation
+    if(deathAnim.active){
+      const p = Math.min(1, deathAnim.t / Math.max(0.0001, deathAnim.duration));
+      const alpha = 0.35 * (1 - Math.pow(1 - p, 2));
+      const grad = ctx.createRadialGradient(deathAnim.x, deathAnim.y, 40, W/2, H/2, Math.max(W,H));
+      grad.addColorStop(0, 'rgba(139,0,0,0)');
+      grad.addColorStop(1, `rgba(139,0,0,${alpha})`);
+      ctx.save();
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,W,H);
+      ctx.restore();
+    }
+
+    // Simple draft prompt header
+    if (state === 'start_p1' || state === 'start_p2'){
+      ctx.save();
+      ctx.font = 'bold 16px "Press Start 2P"';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffff00';
+      ctx.fillText(state==='start_p1' ? 'P1 CHOOSE UPGRADE' : 'P2 CHOOSE UPGRADE', W/2, 60);
+      ctx.restore();
+    }
+    
+    if(zoomApplied){ ctx.restore(); }
+    if(screenShake > 0) { ctx.restore(); }
+  }
+  
+  // Simple explosion effect
+  function createExplosion(x, y, intensity = 1) {
+    screenShake = Math.max(screenShake, 0.15);
+  }
+
+  function spawnDeathExplosion(x, y){
+    // Flash
+    particles.push({type:'flash', life:0.15, maxLife:0.15});
+    // Rings
+    for(let i=0;i<3;i++){
+      particles.push({type:'ring', x, y, r: 22+i*12, lineWidth: 3-i*0.6, color:'#fff', life:0.5+i*0.08, maxLife:0.5+i*0.08});
+    }
+    // Sparks
+    for(let i=0;i<42;i++){
+      const ang = Math.random()*Math.PI*2;
+      const spd = 160 + Math.random()*240;
+      particles.push({type:'spark', x, y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd, size:2+Math.random()*3, color: (Math.random()<0.5?'#ffa500':'#ffcc00'), life:0.9+Math.random()*0.6, maxLife:0.9+Math.random()*0.6});
+    }
+  }
+
+  function updateParticles(dt){
+    for(let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.life -= dt;
+      if(p.life <= 0){ particles.splice(i,1); continue; }
+      if(p.type === 'ring'){
+        p.r += 260*dt; p.lineWidth = Math.max(0.5, p.lineWidth - 2*dt);
+      } else if(p.type === 'spark'){
+        p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= (1-2*dt); p.vy *= (1-2*dt);
+      }
+    }
+  }
+
+  function showYouDied(subtext){
+    if(!deathOverlay) return;
+    if(deathSubtext) deathSubtext.textContent = subtext || '';
+    deathOverlay.style.display = 'flex';
+    deathOverlay.style.animation = 'youDiedFade 2.2s ease-out forwards';
+    setTimeout(()=>{
+      deathOverlay.style.display = 'none';
+      deathOverlay.style.animation = '';
+      if(deathSubtext) deathSubtext.textContent = '';
+    }, 2200);
+  }
+
+  function resetPlayer(p){
+    p.thrust = 180; p.rotSpeed = 2.6;
+    p.fireCd = 0.8; p.fireTimer = 0;
+    p.bulletSpeed = 380; p.maxBounces = 0; p.pierce = 0;
+    p.multishot = 1; p.spread = 15; p.recoil = 0;
+    p.damage = 1;
+    p.alive = true; p.hp = 3; p.maxHp = 3; p.showHpTimer = 0;
+    p.perks = [];
+    p.moveSfxTimer = 0; p.turnSfxTimer = 0;
+  }
+
+  function resetMatch(){
+    // Hide overlays and clear transient state
+    if(deathOverlay){ deathOverlay.style.display = 'none'; if(deathSubtext) deathSubtext.textContent = ''; }
+    if(winOverlay){ winOverlay.style.display = 'none'; }
+    msg.style.display = 'none'; msg.textContent = '';
+    bullets = []; motionTrails = []; particles = [];
+    screenShake = 0; deathAnim.active = false; deathAnim.t = 0; deathAnim.duration = 0;
+    // Reset players
+    for(const t of players){ t.score = 0; resetPlayer(t); }
+    refreshScores(); refreshPerks();
+    state = 'start';
+    startMatchDraft();
+  }
+
+  function showWinOverlay(winner){
+    if(!winOverlay) return;
+    if(winTitle) winTitle.textContent = `PLAYER ${winner===p1?1:2} WINS`;
+    winOverlay.style.display = 'flex';
+    if(playAgainBtn){
+      playAgainBtn.onclick = ()=>{ SFX.play('menuSelect'); resetMatch(); };
+    }
+  }
+
+  // ---------- game loop ----------
+  let last=performance.now();
+  function tick(now){
+    const dt=Math.min(0.033,(now-last)/1000); last=now;
+    const gdt = deathAnim.active ? dt*0.25 : dt;
+    pollGamepads();
+    // Auto-assign controllers if selected but not yet bound
+    if(controlConfig.p1.type === 'controller' && gpIndex.p1 == null){ assignGamepadTo('p1'); }
+    if(controlConfig.p2.type === 'controller' && gpIndex.p2 == null){ assignGamepadTo('p2'); }
+
+    if(state==='round'){
+      for(const t of players){ if(!t.alive) continue; updateControls(t,gdt); t.fireTimer=Math.max(0,t.fireTimer-gdt); if(t.showHpTimer>0) t.showHpTimer-=gdt; t.moveSfxTimer=Math.max(0,(t.moveSfxTimer||0)-gdt); t.turnSfxTimer=Math.max(0,(t.turnSfxTimer||0)-gdt); }
+
+      if(screenShake > 0) { screenShake = Math.max(0, screenShake - gdt * 2); }
+
+      // Update motion trails for CRT effect
+      for(let i = motionTrails.length - 1; i >= 0; i--){
+        const trail = motionTrails[i];
+        trail.life -= gdt;
+        trail.alpha = trail.life / 0.3;
+        trail.size *= 1 - 0.02 * (gdt/0.016);
+        
+        if(trail.life <= 0){
+          motionTrails.splice(i, 1);
+        }
+      }
+      // Update death particles
+      updateParticles(gdt);
+      if(deathAnim.active){
+        deathAnim.t += dt; // progress with real time for overlay pacing
+        if(deathAnim.t >= deathAnim.duration){ deathAnim.active = false; }
+      }
+
+      // integrate bullets & handle wall collisions
+      const minX = arenaPadding, maxX = W - arenaPadding;
+      const minY = arenaPadding, maxY = H - arenaPadding;
+
+      for (const b of bullets){
+        if(b._dead) continue;
+        b.x += b.vx * gdt;
+        b.y += b.vy * gdt;
+
+        let hitX = false, hitY = false;
+        if (b.x - b.r < minX || b.x + b.r > maxX) hitX = true;
+        if (b.y - b.r < minY || b.y + b.r > maxY) hitY = true;
+
+        if (hitX || hitY){
+          if (b.pierce > 0){
+            b.pierce--;
+            if (hitX){ b.x = (b.vx < 0) ? (minX + b.r + 1) : (maxX - b.r - 1); }
+            if (hitY){ b.y = (b.vy < 0) ? (minY + b.r + 1) : (maxY - b.r - 1); }
+          } else if (b.maxBounces && b.maxBounces > 0){
+            if (hitX) b.vx = -b.vx;
+            if (hitY) b.vy = -b.vy;
+            b.maxBounces--;
+            b.x = Math.min(Math.max(b.x, minX + b.r), maxX - b.r);
+            b.y = Math.min(Math.max(b.y, minY + b.r), maxY - b.r);
+            // Play bounce sound for ricochet
+            SFX.play('bounce');
+          } else {
+            b._dead = true;
+          }
+        }
+
+        // collide with maze walls
+        for(const r of walls){
+          if(b._dead) break;
+          const nx = clamp(b.x, r.x, r.x+r.w);
+          const ny = clamp(b.y, r.y, r.y+r.h);
+          const dx = b.x - nx, dy = b.y - ny;
+          if(dx*dx + dy*dy <= b.r*b.r){
+            if (b.pierce > 0){
+              b.pierce--;
+              const len = Math.hypot(b.vx, b.vy) || 1;
+              b.x += (b.vx/len) * (WT + 2);
+              b.y += (b.vy/len) * (WT + 2);
+            } else if (b.maxBounces && b.maxBounces > 0){
+              if (Math.abs(dx) > Math.abs(dy)) b.vx = -b.vx; else b.vy = -b.vy;
+              b.maxBounces--;
+              // Play bounce sound for wall ricochet
+              SFX.play('bounce');
+            } else {
+              b._dead = true;
+            }
+          }
+        }
+      }
+      bullets = bullets.filter(b => !b._dead);
+
+      // bullet vs tank
+      for(const b of bullets){
+        for(const t of players){
+          if(!t.alive || t===b.owner) continue;
+          if(circleHit(b.x,b.y,b.r, t.x,t.y,t.size/2)){
+            t.hp -= b.damage;
+            t.showHpTimer=1.0;
+            screenShake = Math.max(screenShake, 0.1);
+            
+            if(t.hp<=0){ 
+              // Dramatic death sequence
+              SFX.play('tankExplode');
+              showYouDied();
+              screenShake = Math.max(screenShake, 0.5);
+              deathAnim.active = true; deathAnim.t = 0; deathAnim.duration = 2.2; deathAnim.x = t.x; deathAnim.y = t.y;
+              spawnDeathExplosion(t.x, t.y);
+              t.alive=false; 
+            }
+            if(b.pierce>0){ b.pierce--; } else { b._dead=true; }
+            // Play hit sound for tank collision
+            SFX.play('hit');
+          }
+        }
+      }
+      bullets = bullets.filter(b => !b._dead);
+
+      // win check
+      const alive=players.filter(p=>p.alive);
+      if(alive.length<=1){
+        if(alive.length===1){
+          const winner = alive[0];
+          const loser  = (winner===p1) ? p2 : p1;
+          winner.score++; refreshScores();
+          // Show winner message under death overlay if present
+          if(deathOverlay){ if(deathSubtext) deathSubtext.textContent = `P${winner===p1?1:2} wins the round!`; }
+          // Hide legacy msg to avoid overlap with overlay
+          msg.style.display='none'; msg.textContent='';
+          // Play round win sound
+          SFX.play('roundWin');
+          if(winner.score>=ROUND_WINS){
+            state='over';
+            // Play match win sound
+            SFX.play('matchWin');
+            // Show final win screen after death overlay animation
+            setTimeout(()=>{ showWinOverlay(winner); }, 2300);
+          } else {
+            state='draft';
+            setTimeout(()=>{ msg.style.display='none'; openLoserChoice(loser); }, 2000);
+          }
+        } else {
+          msg.style.display='block'; msg.textContent='Double KO!';
+          // Play explosion sound for double KO
+          SFX.play('explode');
+          setTimeout(()=>{ msg.style.display='none'; resetRound(); }, 2000);
+        }
+      }
+
+      if(keys.has('r')||keys.has('R')){ resetRound(); }
+    } else if(state==='z_round'){
+      if(paused){
+        // Draw static scene while paused
+        draw(); requestAnimationFrame(tick); return;
+      }
+      // players update
+      for(const t of players){ if(!t.alive) continue; updateControls(t,gdt); t.fireTimer=Math.max(0,t.fireTimer-gdt); if(t.showHpTimer>0) t.showHpTimer-=gdt; t.moveSfxTimer=Math.max(0,(t.moveSfxTimer||0)-gdt); t.turnSfxTimer=Math.max(0,(t.turnSfxTimer||0)-gdt); }
+
+      if(screenShake > 0) { screenShake = Math.max(0, screenShake - gdt * 2); }
+      // trails and particles
+      for(let i = motionTrails.length - 1; i >= 0; i--){
+        const trail = motionTrails[i];
+        trail.life -= gdt; trail.alpha = trail.life / 0.3; trail.size *= 1 - 0.02 * (gdt/0.016);
+        if(trail.life <= 0){ motionTrails.splice(i, 1); }
+      }
+      updateParticles(gdt);
+      if(bossActive){ updateBoss(gdt); }
+      if(deathAnim.active){ deathAnim.t += dt; if(deathAnim.t >= deathAnim.duration){ deathAnim.active = false; } }
+
+      // bullets integrate and collide with arena/walls
+      const minX = arenaPadding, maxX = W - arenaPadding;
+      const minY = arenaPadding, maxY = H - arenaPadding;
+      for (const b of bullets){
+        if(b._dead) continue;
+        b.x += b.vx * gdt;
+        b.y += b.vy * gdt;
+        let hitX = false, hitY = false;
+        if (b.x - b.r < minX || b.x + b.r > maxX) hitX = true;
+        if (b.y - b.r < minY || b.y + b.r > maxY) hitY = true;
+        if (hitX || hitY){
+          if (b.pierce > 0){
+            b.pierce--; if (hitX){ b.x = (b.vx < 0) ? (minX + b.r + 1) : (maxX - b.r - 1); } if (hitY){ b.y = (b.vy < 0) ? (minY + b.r + 1) : (maxY - b.r - 1); }
+          } else if (b.maxBounces && b.maxBounces > 0){
+            if (hitX) b.vx = -b.vx; if (hitY) b.vy = -b.vy; b.maxBounces--; b.x = Math.min(Math.max(b.x, minX + b.r), maxX - b.r); b.y = Math.min(Math.max(b.y, minY + b.r), maxY - b.r); SFX.play('bounce');
+          } else { b._dead = true; }
+        }
+        for(const r of walls){ if(b._dead) break; const nx = clamp(b.x, r.x, r.x+r.w); const ny = clamp(b.y, r.y, r.y+r.h); const dx = b.x - nx, dy = b.y - ny; if(dx*dx + dy*dy <= b.r*b.r){ if (b.pierce > 0){ b.pierce--; const len = Math.hypot(b.vx, b.vy) || 1; b.x += (b.vx/len) * (WT + 2); b.y += (b.vy/len) * (WT + 2); } else if (b.maxBounces && b.maxBounces > 0){ if (Math.abs(dx) > Math.abs(dy)) b.vx = -b.vx; else b.vy = -b.vy; b.maxBounces--; SFX.play('bounce'); } else { b._dead = true; } } }
+      }
+      bullets = bullets.filter(b => !b._dead);
+
+      // mines update: arm timer and trigger with zombies
+      if(mines && mines.length){
+        for(const m of mines){
+          if(m._dead) continue;
+          m.armTime -= gdt; if(m.armTime <= 0) m.armed = true;
+          if(!m.armed) continue;
+          let shouldExplode = false;
+          if(gameMode === 'zombies'){
+            for(const z of zombies){
+              if(z._dead) continue;
+              const d2 = (z.x-m.x)*(z.x-m.x) + (z.y-m.y)*(z.y-m.y);
+              if(d2 <= m.radius*m.radius){ shouldExplode = true; break; }
+            }
+          } else {
+            // versus: trigger on enemy player
+            for(const t of players){
+              if(!t.alive) continue;
+              if(t === m.owner) continue; // don't trigger on owner
+              const d2 = (t.x-m.x)*(t.x-m.x) + (t.y-m.y)*(t.y-m.y);
+              if(d2 <= m.radius*m.radius){ shouldExplode = true; break; }
+            }
+          }
+          if(shouldExplode){
+            SFX.play('explode');
+            screenShake = Math.max(screenShake, 0.4);
+            createExplosion(m.x, m.y, 1);
+            if(gameMode === 'zombies'){
+              // damage zombies in radius
+              for(const zz of zombies){
+                if(zz._dead) continue;
+                const dd2 = (zz.x-m.x)*(zz.x-m.x) + (zz.y-m.y)*(zz.y-m.y);
+                if(dd2 <= m.radius*m.radius){
+                  zz.hp -= m.damage;
+                  if(zz.hp <= 0){
+                    zz._dead = true;
+                    zombiesRemaining = Math.max(0, zombiesRemaining - 1);
+                    const killer = m.owner;
+                    if(killer){
+                      killer.zKills = (killer.zKills||0) + 1;
+                      if(!killer.zPerkThreshold) killer.zPerkThreshold = 5;
+                      if(!killer.zDraftOpen && killer.zKills >= killer.zPerkThreshold){
+                        killer.zDraftOpen = true;
+                        showDraft(killer, `Player ${killer===p1?1:2} — choose an upgrade`, ()=>{
+                          killer.zDraftOpen = false;
+                          // Gradual linear-increasing increments for mines credit path
+                          const inc = (killer.zIncCurrent||3);
+                          const step = (killer.zIncStep||2);
+                          killer.zIncCurrent = inc + step;
+                          killer.zPerkThreshold += killer.zIncCurrent;
+                        });
+                      }
+                      refreshKills();
+                    }
+                  }
+                }
+              }
+            } else {
+              // versus: damage enemy player in radius
+              for(const t of players){
+                if(!t.alive) continue;
+                if(t === m.owner) continue;
+                const dd2 = (t.x-m.x)*(t.x-m.x) + (t.y-m.y)*(t.y-m.y);
+                if(dd2 <= m.radius*m.radius){
+                  t.hp = Math.max(0, t.hp - m.damage);
+                  t.showHpTimer = 1.0;
+                  if(t.hp <= 0){
+                    t.alive = false;
+                    SFX.play('tankExplode');
+                    spawnDeathExplosion(t.x, t.y);
+                  }
+                }
+              }
+            }
+            m._dead = true;
+          }
+        }
+        mines = mines.filter(m=>!m._dead);
+      }
+
+      // bullets vs zombies (humans bullets only)
+      for(const b of bullets){
+        if(b._dead) continue;
+        if(b.ownerTeam !== 'humans') continue;
+        for(const z of zombies){
+          if(z._dead) continue;
+          if(circleHit(b.x,b.y,b.r, z.x,z.y,z.size/2)){
+            z.hp -= b.damage; SFX.play('hit');
+            if(z.hp <= 0){
+              z._dead = true; zombiesRemaining = Math.max(0, zombiesRemaining - 1); createExplosion(z.x, z.y, 1);
+              // credit kill to nearest player and check perk thresholds
+              let killer = null; let bestD2 = Infinity;
+              for(const p of players){
+                const d2 = (p.x-b.x)*(p.x-b.x) + (p.y-b.y)*(p.y-b.y);
+                if(d2 < bestD2){ bestD2 = d2; killer = p; }
+              }
+              if(killer){
+                killer.zKills = (killer.zKills||0) + 1;
+                if(!killer.zPerkThreshold) killer.zPerkThreshold = 5;
+                if(!killer.zDraftOpen && killer.zKills >= killer.zPerkThreshold){
+                  killer.zDraftOpen = true;
+                  showDraft(killer, `Player ${killer===p1?1:2} — choose an upgrade`, ()=>{
+                    killer.zDraftOpen = false;
+                    // Gradual linear-increasing increments: 3,5,7,9,...
+                    const inc = (killer.zIncCurrent||3);
+                    const step = (killer.zIncStep||2);
+                    killer.zIncCurrent = inc + step; // next increment grows by +2
+                    killer.zPerkThreshold += killer.zIncCurrent;
+                  });
+                }
+                refreshKills();
+              }
+            }
+            if(b.pierce>0){ b.pierce--; } else { b._dead = true; }
+            break;
+          }
+        }
+      }
+      zombies = zombies.filter(z=>!z._dead || z.hp>0);
+
+      // bullets vs boss (humans bullets only)
+      if(bossActive && boss && !boss._dead){
+        for(const b of bullets){
+          if(b._dead) continue;
+          if(b.ownerTeam !== 'humans') continue;
+          if(circleHit(b.x,b.y,b.r, boss.x,boss.y,boss.size/2)){
+            boss.hp -= b.damage; SFX.play('hit');
+            if(b.pierce>0){ b.pierce--; } else { b._dead = true; }
+            if(boss.hp <= 0){
+              boss._dead = true; bossActive = false; SFX.play('bossDeath'); createExplosion(boss.x, boss.y, 1);
+              // Rewards: grant a draft to both players
+              paused = true; let grants = 0;
+              const done = ()=>{ grants++; if(grants>=players.length){ paused=false; nextWaveTimer = 2.0; } };
+              showDraft(p1, 'Boss defeated — P1 choose an upgrade', ()=>{ done(); });
+              showDraft(p2, 'Boss defeated — P2 choose an upgrade', ()=>{ done(); });
+            }
+          }
+        }
+      }
+
+      // zombies update (touch damage to players handled inside)
+      updateZombies(gdt);
+
+      // end conditions and wave progression
+      const aliveHumans = players.filter(p=>p.alive).length;
+      if(aliveHumans === 0){
+        state = 'z_over';
+        // Show zombies game over screen with stats
+        if(zOverOverlay && zOverStats){
+          const totalKills = (p1.zKills||0) + (p2.zKills||0);
+          zOverStats.textContent = `You survived to Wave ${wave}. Total Kills: ${totalKills}`;
+          zOverOverlay.style.display = 'flex';
+        }
+        if(zOverBtn){
+          zOverBtn.onclick = ()=>{ 
+            SFX.play('menuSelect'); 
+            if(zOverOverlay) zOverOverlay.style.display = 'none'; 
+            startZombies();
+          };
+        }
+      } else if((!bossActive && zombiesRemaining === 0 && zombies.length === 0) || (bossActive && boss && boss._dead)){
+        if(nextWaveTimer <= 0){ nextWaveTimer = 2.0; SFX.play('roundWin'); }
+        nextWaveTimer -= gdt;
+        if(nextWaveTimer <= 0){ spawnNextWave(); }
+      }
+
+      if(keys.has('r')||keys.has('R')){ startZombies(); }
+    } else if(state==='z_over'){
+      if(keys.has('r')||keys.has('R')){ startZombies(); }
+    }
+
+    // HUD
+    if(gameMode === 'zombies'){
+      if(state==='z_round' || state==='z_over'){
+        const k1 = p1.zKills || 0;
+        const k2 = p2.zKills || 0;
+        if(bossActive && boss && !boss._dead){
+          hud.textContent = `WAVE ${wave}  |  BOSS  |  K1: ${k1}  K2: ${k2}`;
+        } else {
+          hud.textContent = `WAVE ${wave}  |  Z LEFT: ${zombiesRemaining}  |  K1: ${k1}  K2: ${k2}`;
+        }
+      } else {
+        hud.textContent = '';
+      }
+    } else {
+      hud.textContent = '';
+    }
+    draw();
+    requestAnimationFrame(tick);
+  }
+  
+  // boot: show mode selection first
+  showModeSelection();
+  requestAnimationFrame(tick);
+  refreshScores();
+  refreshPerks();
+
+  // ---------- sidebar/score helpers ----------
+  function refreshScores(){
+    p1ScoreEl.textContent = p1.score;
+    p2ScoreEl.textContent = p2.score;
+    p1ScoreEl.style.borderColor = p1.color;
+    p2ScoreEl.style.borderColor = p2.color;
+  }
+
+  function refreshKills(){
+    if(!p1KillsEl || !p2KillsEl) return;
+    const k1 = p1.zKills || 0;
+    const k2 = p2.zKills || 0;
+    p1KillsEl.textContent = `K: ${k1}`;
+    p2KillsEl.textContent = `K: ${k2}`;
+    p1KillsEl.style.borderColor = p1.color;
+    p2KillsEl.style.borderColor = p2.color;
+  }
+
+  // ----- perk list render -----
+  function refreshPerks(){
+    const perkCol = document.getElementById('perks');
+    perkCol.innerHTML = '';
+    for(const p of players){
+      const col = document.createElement('div');
+      col.style.cssText = `
+        border: 2px solid ${p.color};
+        background: #000;
+        color: #fff;
+        padding: 6px;
+        margin: 2px;
+        font-family: 'Press Start 2P', monospace;
+        font-size: 7px;
+        line-height: 1.2;
+      `;
+      
+      col.innerHTML = `<div style="color: ${p.color}; font-weight: bold; margin-bottom: 3px;">P${p===p1?1:2} PERKS</div>`;
+      
+      if(p.perks && p.perks.length > 0){
+        for(const perk of p.perks){
+          const perkEl = document.createElement('div');
+          perkEl.style.cssText = `
+            margin-bottom: 3px;
+            padding: 2px;
+            border-left: 2px solid ${perk.color || '#ffffff'};
+            padding-left: 4px;
+          `;
+          // Add rarity indicator
+          let rarityText = '';
+          let rarityColor = '#ffffff';
+          if(perk.rarity === 'rare') {
+            rarityText = ' [RARE]';
+            rarityColor = '#00aaff';
+          } else if(perk.rarity === 'legendary') {
+            rarityText = ' [LEGENDARY]';
+            rarityColor = '#ffdd00';
+          } else if(perk.rarity === 'mythical') {
+            rarityText = ' [MYTHICAL]';
+            rarityColor = '#ffff00';
+          }
+          
+          perkEl.innerHTML = `
+            <strong style="color: ${perk.color || '#ffffff'}; display: block; margin-bottom: 1px;">${perk.name}<span style="color: ${rarityColor}; font-size: 6px;">${rarityText}</span></strong>
+            <span class="good" style="color: #00ff41; display: block; margin-bottom: 1px;">${perk.good}</span>
+            <span class="bad" style="color: #ff4444; display: block;">${perk.bad}</span>
+          `;
+          col.appendChild(perkEl);
+        }
+      } else {
+        col.innerHTML += '<div style="color: #666; font-style: italic;">No perks yet</div>';
+      }
+      
+      perkCol.appendChild(col);
+    }
+  }
+
+})();
+</script>
+</body>
+</html>

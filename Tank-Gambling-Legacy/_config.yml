@@ -1,0 +1,8 @@
+# GitHub Pages Configuration
+# This file tells GitHub Pages to serve the files directly without Jekyll processing
+
+include: []
+exclude: []
+keep_files: []
+safe: true
+plugins: []

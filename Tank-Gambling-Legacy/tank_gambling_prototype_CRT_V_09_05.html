@@ -481,6 +481,16 @@
   <div id="deathOverlay"><div class="deathTitle">YOU DIED</div><div id="deathSubtext"></div></div>
   <div id="winOverlay"><div class="winTitle" id="winTitle"></div><button id="playAgainBtn">PLAY AGAIN</button></div>
   <div id="zOverOverlay"><div id="zOverTitle">ZOMBIES FAILED</div><div id="zOverStats"></div><button id="zOverBtn">TRY AGAIN</button></div>
+  <div id="zCompleteOverlay" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;pointer-events:auto;z-index:2500;background:rgba(0,0,0,0.88);">
+    <div style="color:#00ff00;text-shadow:0 0 2px #000, 0 0 8px rgba(0,255,0,0.6);font-family:'Press Start 2P',monospace;font-weight:900;letter-spacing:3px;font-size:48px;text-align:center;margin-bottom:12px;">GAME COMPLETE!</div>
+    <div id="zCompleteStats" style="color:#ffffff;font-family:'Press Start 2P',monospace;font-size:14px;text-align:center;margin-top:6px;"></div>
+    <button id="zCompleteBtn" style="margin-top:24px;background:#000;color:#ffffff;border:2px solid #ffffff;padding:12px 22px;cursor:pointer;font-family:'Press Start 2P',monospace;font-size:14px;">PLAY AGAIN</button>
+  </div>
+  <div id="levelTransitionOverlay" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;pointer-events:none;z-index:3000;background:rgba(0,0,0,0.9);">
+    <div id="levelTransitionTitle" style="color:#00ff00;text-shadow:0 0 4px #000, 0 0 12px rgba(0,255,0,0.8);font-family:'Press Start 2P',monospace;font-weight:900;letter-spacing:2px;font-size:32px;text-align:center;margin-bottom:8px;">LEVEL COMPLETE</div>
+    <div id="levelTransitionSubtitle" style="color:#ffffff;font-family:'Press Start 2P',monospace;font-size:16px;text-align:center;margin-bottom:16px;">ADVANCING TO NEXT AREA...</div>
+    <div id="levelTransitionName" style="color:#ffff00;text-shadow:0 0 4px #000, 0 0 8px rgba(255,255,0,0.6);font-family:'Press Start 2P',monospace;font-size:20px;text-align:center;font-weight:bold;">TUTORIAL</div>
+  </div>
   <div id="devConsole"><div id="devLog"></div><input id="devInput" placeholder=">" autocomplete="off" /></div>
   <div id="ui"><div id="choiceUI"></div></div>
   <button id="devMenuBtn">DEV MENU</button>
@@ -731,6 +741,329 @@
   let nextWaveTimer = 0;
   let boss = null; // active boss entity when present
   let bossActive = false; // true on boss waves while boss alive
+  
+  // Sidescroller level system
+  let currentLevel = 0;
+  let levelComplete = false;
+  let exitDoor = null; // Door object for level exit
+  let levelData = []; // Predefined level layouts
+  
+  // Level transition system
+  let transitionState = 'none'; // 'none', 'fade_out', 'loading', 'fade_in'
+  let transitionTimer = 0;
+  let transitionDuration = 1.5; // seconds
+  let nextLevelIndex = 0;
+  
+  // Door system
+  let entranceDoor = null; // Door at the left side where players spawn
+  
+  // Initialize level data for sidescroller
+  function initLevelData() {
+    levelData = [
+      // Level 0 - Tutorial: Simple maze
+      {
+        name: "TUTORIAL",
+        walls: [
+          {x: arenaPadding, y: arenaPadding, w: WT, h: innerH + WT}, // Left wall
+          {x: arenaPadding + innerW - WT, y: arenaPadding, w: WT, h: innerH + WT}, // Right wall
+          {x: arenaPadding, y: arenaPadding, w: innerW + WT, h: WT}, // Top wall
+          {x: arenaPadding, y: arenaPadding + innerH - WT, w: innerW + WT, h: WT}, // Bottom wall
+          // Simple obstacles
+          {x: arenaPadding + 200, y: arenaPadding + 100, w: 60, h: 20},
+          {x: arenaPadding + 400, y: arenaPadding + 200, w: 40, h: 40},
+          {x: arenaPadding + 600, y: arenaPadding + 150, w: 50, h: 30}
+        ],
+        zombieCount: 3,
+        isBoss: false
+      },
+      // Level 1 - Industrial: Complex machinery layout
+      {
+        name: "INDUSTRIAL ZONE",
+        walls: [
+          {x: arenaPadding, y: arenaPadding, w: WT, h: innerH + WT},
+          {x: arenaPadding + innerW - WT, y: arenaPadding, w: WT, h: innerH + WT},
+          {x: arenaPadding, y: arenaPadding, w: innerW + WT, h: WT},
+          {x: arenaPadding, y: arenaPadding + innerH - WT, w: innerW + WT, h: WT},
+          // Industrial obstacles - machinery and pipes
+          {x: arenaPadding + 120, y: arenaPadding + 80, w: 100, h: 15},
+          {x: arenaPadding + 120, y: arenaPadding + 120, w: 15, h: 80},
+          {x: arenaPadding + 250, y: arenaPadding + 60, w: 20, h: 120},
+          {x: arenaPadding + 300, y: arenaPadding + 200, w: 80, h: 20},
+          {x: arenaPadding + 300, y: arenaPadding + 240, w: 20, h: 60},
+          {x: arenaPadding + 450, y: arenaPadding + 100, w: 60, h: 15},
+          {x: arenaPadding + 450, y: arenaPadding + 140, w: 15, h: 100},
+          {x: arenaPadding + 550, y: arenaPadding + 180, w: 100, h: 15},
+          {x: arenaPadding + 650, y: arenaPadding + 120, w: 20, h: 80}
+        ],
+        zombieCount: 5,
+        isBoss: false
+      },
+      // Level 2 - Boss: Arena with cover
+      {
+        name: "BOSS ARENA",
+        walls: [
+          {x: arenaPadding, y: arenaPadding, w: WT, h: innerH + WT},
+          {x: arenaPadding + innerW - WT, y: arenaPadding, w: WT, h: innerH + WT},
+          {x: arenaPadding, y: arenaPadding, w: innerW + WT, h: WT},
+          {x: arenaPadding, y: arenaPadding + innerH - WT, w: innerW + WT, h: WT},
+          // Arena cover - strategic positioning
+          {x: arenaPadding + 150, y: arenaPadding + 100, w: 80, h: 20},
+          {x: arenaPadding + 150, y: arenaPadding + 300, w: 80, h: 20},
+          {x: arenaPadding + 300, y: arenaPadding + 150, w: 20, h: 100},
+          {x: arenaPadding + 500, y: arenaPadding + 120, w: 100, h: 20},
+          {x: arenaPadding + 500, y: arenaPadding + 280, w: 100, h: 20},
+          {x: arenaPadding + 650, y: arenaPadding + 180, w: 20, h: 80}
+        ],
+        zombieCount: 0,
+        isBoss: true
+      },
+      // Level 3 - Urban: City-like layout with buildings
+      {
+        name: "URBAN WARFARE",
+        walls: [
+          {x: arenaPadding, y: arenaPadding, w: WT, h: innerH + WT},
+          {x: arenaPadding + innerW - WT, y: arenaPadding, w: WT, h: innerH + WT},
+          {x: arenaPadding, y: arenaPadding, w: innerW + WT, h: WT},
+          {x: arenaPadding, y: arenaPadding + innerH - WT, w: innerW + WT, h: WT},
+          // Urban buildings and structures
+          {x: arenaPadding + 100, y: arenaPadding + 50, w: 60, h: 80},
+          {x: arenaPadding + 180, y: arenaPadding + 50, w: 40, h: 60},
+          {x: arenaPadding + 240, y: arenaPadding + 100, w: 50, h: 100},
+          {x: arenaPadding + 320, y: arenaPadding + 60, w: 30, h: 120},
+          {x: arenaPadding + 380, y: arenaPadding + 80, w: 70, h: 40},
+          {x: arenaPadding + 480, y: arenaPadding + 120, w: 50, h: 80},
+          {x: arenaPadding + 550, y: arenaPadding + 60, w: 40, h: 100},
+          {x: arenaPadding + 610, y: arenaPadding + 180, w: 60, h: 60},
+          {x: arenaPadding + 690, y: arenaPadding + 100, w: 30, h: 80}
+        ],
+        zombieCount: 8,
+        isBoss: false
+      },
+      // Level 4 - Laboratory: Complex scientific facility
+      {
+        name: "LABORATORY",
+        walls: [
+          {x: arenaPadding, y: arenaPadding, w: WT, h: innerH + WT},
+          {x: arenaPadding + innerW - WT, y: arenaPadding, w: WT, h: innerH + WT},
+          {x: arenaPadding, y: arenaPadding, w: innerW + WT, h: WT},
+          {x: arenaPadding, y: arenaPadding + innerH - WT, w: innerW + WT, h: WT},
+          // Laboratory equipment and barriers
+          {x: arenaPadding + 100, y: arenaPadding + 80, w: 120, h: 20},
+          {x: arenaPadding + 100, y: arenaPadding + 120, w: 20, h: 100},
+          {x: arenaPadding + 140, y: arenaPadding + 180, w: 80, h: 20},
+          {x: arenaPadding + 250, y: arenaPadding + 60, w: 20, h: 140},
+          {x: arenaPadding + 290, y: arenaPadding + 100, w: 100, h: 20},
+          {x: arenaPadding + 290, y: arenaPadding + 140, w: 20, h: 80},
+          {x: arenaPadding + 330, y: arenaPadding + 200, w: 80, h: 20},
+          {x: arenaPadding + 450, y: arenaPadding + 80, w: 20, h: 120},
+          {x: arenaPadding + 490, y: arenaPadding + 120, w: 100, h: 20},
+          {x: arenaPadding + 490, y: arenaPadding + 160, w: 20, h: 60},
+          {x: arenaPadding + 530, y: arenaPadding + 200, w: 80, h: 20},
+          {x: arenaPadding + 650, y: arenaPadding + 100, w: 20, h: 100},
+          {x: arenaPadding + 690, y: arenaPadding + 140, w: 60, h: 20}
+        ],
+        zombieCount: 0,
+        isBoss: true
+      },
+      // Level 5 - Final: Ultimate challenge
+      {
+        name: "FINAL BATTLE",
+        walls: [
+          {x: arenaPadding, y: arenaPadding, w: WT, h: innerH + WT},
+          {x: arenaPadding + innerW - WT, y: arenaPadding, w: WT, h: innerH + WT},
+          {x: arenaPadding, y: arenaPadding, w: innerW + WT, h: WT},
+          {x: arenaPadding, y: arenaPadding + innerH - WT, w: innerW + WT, h: WT},
+          // Ultimate challenge - complex maze-like layout
+          {x: arenaPadding + 100, y: arenaPadding + 80, w: 80, h: 20},
+          {x: arenaPadding + 100, y: arenaPadding + 120, w: 20, h: 60},
+          {x: arenaPadding + 140, y: arenaPadding + 160, w: 60, h: 20},
+          {x: arenaPadding + 220, y: arenaPadding + 60, w: 20, h: 100},
+          {x: arenaPadding + 260, y: arenaPadding + 100, w: 80, h: 20},
+          {x: arenaPadding + 260, y: arenaPadding + 140, w: 20, h: 80},
+          {x: arenaPadding + 300, y: arenaPadding + 200, w: 60, h: 20},
+          {x: arenaPadding + 380, y: arenaPadding + 80, w: 20, h: 120},
+          {x: arenaPadding + 420, y: arenaPadding + 120, w: 80, h: 20},
+          {x: arenaPadding + 420, y: arenaPadding + 160, w: 20, h: 60},
+          {x: arenaPadding + 460, y: arenaPadding + 200, w: 60, h: 20},
+          {x: arenaPadding + 540, y: arenaPadding + 100, w: 20, h: 100},
+          {x: arenaPadding + 580, y: arenaPadding + 140, w: 80, h: 20},
+          {x: arenaPadding + 580, y: arenaPadding + 180, w: 20, h: 80},
+          {x: arenaPadding + 620, y: arenaPadding + 240, w: 60, h: 20},
+          {x: arenaPadding + 700, y: arenaPadding + 120, w: 20, h: 100}
+        ],
+        zombieCount: 0,
+        isBoss: true
+      }
+    ];
+  }
+  
+  // Create exit door
+  function createExitDoor() {
+    exitDoor = {
+      x: arenaPadding + innerW - 40,
+      y: arenaPadding + innerH / 2 - 30,
+      w: 30,
+      h: 60,
+      color: '#00ff00',
+      active: false,
+      open: false
+    };
+  }
+  
+  // Create entrance door
+  function createEntranceDoor() {
+    entranceDoor = {
+      x: arenaPadding - 10,
+      y: arenaPadding + innerH / 2 - 30,
+      w: 30,
+      h: 60,
+      color: '#ff6600',
+      active: true,
+      open: true
+    };
+  }
+  
+  // Load a specific level
+  function loadLevel(levelIndex) {
+    if (levelIndex >= levelData.length) {
+      // Game complete!
+      state = 'z_complete';
+      showGameComplete();
+      return;
+    }
+    
+    currentLevel = levelIndex;
+    levelComplete = false;
+    const level = levelData[levelIndex];
+    
+    // Set walls for this level
+    walls = [...level.walls];
+    
+    // Position players at the left side
+    p1.x = arenaPadding + 50; p1.y = arenaPadding + innerH * 0.33; p1.a = 0;
+    p2.x = arenaPadding + 50; p2.y = arenaPadding + innerH * 0.66; p2.a = 0;
+    
+    // Clear zombies and bullets
+    zombies = [];
+    bullets = [];
+    mines = [];
+    boss = null;
+    bossActive = false;
+    
+    // Spawn zombies or boss
+    if (level.isBoss) {
+      boss = makeBoss();
+      bossActive = true;
+      zombiesRemaining = 0;
+    } else {
+      spawnLevelZombies(level.zombieCount);
+    }
+    
+    // Create doors
+    createExitDoor();
+    createEntranceDoor();
+    
+    // Reset player states
+    for(const t of players){ 
+      t.alive = true; 
+      t.hp = t.maxHp; 
+      t.showHpTimer = 0; 
+    }
+    
+    refreshKills();
+  }
+  
+  // Spawn zombies for current level
+  function spawnLevelZombies(count) {
+    zombies = [];
+    for(let i = 0; i < count; i++) {
+      // Spawn zombies on the right side of the level
+      let x = arenaPadding + innerW - 80 - (i * 40);
+      let y = arenaPadding + 50 + Math.random() * (innerH - 100);
+      
+      const z = makeZombie(x, y);
+      zombies.push(z);
+    }
+    zombiesRemaining = zombies.length;
+  }
+  
+  // Check if players can exit level
+  function checkLevelExit() {
+    if (!exitDoor || !exitDoor.active) return;
+    
+    for(const p of players) {
+      if (!p.alive) continue;
+      
+      // Check if player is near the door
+      const dx = p.x - (exitDoor.x + exitDoor.w/2);
+      const dy = p.y - (exitDoor.y + exitDoor.h/2);
+      const distance = Math.sqrt(dx*dx + dy*dy);
+      
+      if (distance < 50) {
+        // Player reached the door - start transition
+        startLevelTransition(currentLevel + 1);
+        break;
+      }
+    }
+  }
+  
+  // Start level transition
+  function startLevelTransition(nextLevel) {
+    if (transitionState !== 'none') return;
+    
+    nextLevelIndex = nextLevel;
+    transitionState = 'fade_out';
+    transitionTimer = 0;
+    SFX.play('roundWin');
+  }
+  
+  // Update level transition
+  function updateLevelTransition(dt) {
+    if (transitionState === 'none') return;
+    
+    transitionTimer += dt;
+    
+    switch (transitionState) {
+      case 'fade_out':
+        if (transitionTimer >= transitionDuration * 0.4) {
+          transitionState = 'loading';
+          transitionTimer = 0;
+          // Load the next level
+          loadLevel(nextLevelIndex);
+        }
+        break;
+        
+      case 'loading':
+        if (transitionTimer >= 0.5) {
+          transitionState = 'fade_in';
+          transitionTimer = 0;
+        }
+        break;
+        
+      case 'fade_in':
+        if (transitionTimer >= transitionDuration * 0.4) {
+          transitionState = 'none';
+          transitionTimer = 0;
+        }
+        break;
+    }
+  }
+  
+  // Get transition alpha for fade effect
+  function getTransitionAlpha() {
+    if (transitionState === 'none') return 0;
+    
+    const progress = transitionTimer / (transitionDuration * 0.4);
+    
+    switch (transitionState) {
+      case 'fade_out':
+        return Math.min(1, progress);
+      case 'fade_in':
+        return Math.max(0, 1 - progress);
+      default:
+        return 1;
+    }
+  }
 
   // ---------- maze ----------
   function genMaze(){
@@ -1288,12 +1621,12 @@
   }
 
   function startZombies(){
-    // Reset players to co-op start positions
-    genMaze();
+    // Initialize level data
+    initLevelData();
+    
+    // Reset players
     for(const t of players){ resetPlayer(t); }
-    // Players on left side, spaced vertically, facing right
-    p1.x = arenaPadding + CW*0.5; p1.y = arenaPadding + innerH * 0.33; p1.a = 0;
-    p2.x = arenaPadding + CW*0.5; p2.y = arenaPadding + innerH * 0.66; p2.a = 0;
+    
     // Zombie-mode progression stats (gradual linear-increasing increments)
     for(const t of players){
       t.zKills = 0;
@@ -1303,11 +1636,16 @@
       t.zPerkThreshold = t.zIncCurrent; // first threshold at 3 kills total
       t.zDraftOpen = false;
     }
+    
+    // Clear state
     zombies = []; wave = 0; zombiesRemaining = 0; nextWaveTimer = 0; mines = [];
+    currentLevel = 0; levelComplete = false; exitDoor = null;
+    
     if(zOverOverlay){ zOverOverlay.style.display = 'none'; }
     state = 'z_round';
-    spawnNextWave();
-    refreshKills();
+    
+    // Load first level
+    loadLevel(0);
   }
 
   function spawnNextWave(){
@@ -2574,6 +2912,101 @@
       ctx.fillStyle = '#ff00aa';
       ctx.fillRect(barX, barY, barW * ratio, 10);
     }
+    
+    // Entrance door render
+    if(gameMode === 'zombies' && entranceDoor){
+      ctx.save();
+      if(entranceDoor.open){
+        // Open door - glowing orange
+        ctx.shadowColor = '#ff6600';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#ff6600';
+      } else {
+        // Closed door - dim gray
+        ctx.fillStyle = '#333333';
+      }
+      ctx.fillRect(entranceDoor.x, entranceDoor.y, entranceDoor.w, entranceDoor.h);
+      
+      // Door frame
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(entranceDoor.x, entranceDoor.y, entranceDoor.w, entranceDoor.h);
+      
+      // Door text
+      if(entranceDoor.open){
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 8px "Press Start 2P"';
+        ctx.textAlign = 'center';
+        ctx.fillText('ENTER', entranceDoor.x + entranceDoor.w/2, entranceDoor.y + entranceDoor.h/2 + 3);
+      }
+      
+      ctx.restore();
+    }
+    
+    // Exit door render
+    if(gameMode === 'zombies' && exitDoor){
+      ctx.save();
+      if(exitDoor.active){
+        // Active door - glowing green
+        ctx.shadowColor = '#00ff00';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#00ff00';
+      } else {
+        // Inactive door - dim gray
+        ctx.fillStyle = '#333333';
+      }
+      ctx.fillRect(exitDoor.x, exitDoor.y, exitDoor.w, exitDoor.h);
+      
+      // Door frame
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(exitDoor.x, exitDoor.y, exitDoor.w, exitDoor.h);
+      
+      // Door text
+      if(exitDoor.active){
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 8px "Press Start 2P"';
+        ctx.textAlign = 'center';
+        ctx.fillText('EXIT', exitDoor.x + exitDoor.w/2, exitDoor.y + exitDoor.h/2 + 3);
+      }
+      
+      ctx.restore();
+    }
+    
+    // Level transition overlay
+    if(gameMode === 'zombies' && transitionState !== 'none'){
+      const alpha = getTransitionAlpha();
+      if(alpha > 0){
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, W, H);
+        
+        // Transition text
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#00ff00';
+        ctx.font = 'bold 24px "Press Start 2P"';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = '#00ff00';
+        ctx.shadowBlur = 8;
+        ctx.fillText('LEVEL COMPLETE', W/2, H/2 - 40);
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 16px "Press Start 2P"';
+        ctx.shadowBlur = 4;
+        ctx.fillText('ADVANCING TO NEXT AREA...', W/2, H/2);
+        
+        if(levelData[nextLevelIndex]){
+          ctx.fillStyle = '#ffff00';
+          ctx.font = 'bold 20px "Press Start 2P"';
+          ctx.shadowColor = '#ffff00';
+          ctx.shadowBlur = 6;
+          ctx.fillText(levelData[nextLevelIndex].name, W/2, H/2 + 40);
+        }
+        
+        ctx.restore();
+      }
+    }
 
     // Simple tanks with balanced CRT glow
     for(const t of players){
@@ -2760,6 +3193,27 @@
     winOverlay.style.display = 'flex';
     if(playAgainBtn){
       playAgainBtn.onclick = ()=>{ SFX.play('menuSelect'); resetMatch(); };
+    }
+  }
+  
+  function showGameComplete(){
+    const zCompleteOverlay = document.getElementById('zCompleteOverlay');
+    const zCompleteStats = document.getElementById('zCompleteStats');
+    const zCompleteBtn = document.getElementById('zCompleteBtn');
+    
+    if(!zCompleteOverlay) return;
+    
+    const totalKills = (p1.zKills||0) + (p2.zKills||0);
+    if(zCompleteStats) zCompleteStats.textContent = `All levels completed! Total Kills: ${totalKills}`;
+    
+    zCompleteOverlay.style.display = 'flex';
+    
+    if(zCompleteBtn){
+      zCompleteBtn.onclick = ()=>{ 
+        SFX.play('menuSelect'); 
+        zCompleteOverlay.style.display = 'none'; 
+        startZombies();
+      };
     }
   }
 
@@ -3092,14 +3546,14 @@
       // zombies update (touch damage to players handled inside)
       updateZombies(gdt);
 
-      // end conditions and wave progression
+      // end conditions and level progression
       const aliveHumans = players.filter(p=>p.alive).length;
       if(aliveHumans === 0){
         state = 'z_over';
         // Show zombies game over screen with stats
         if(zOverOverlay && zOverStats){
           const totalKills = (p1.zKills||0) + (p2.zKills||0);
-          zOverStats.textContent = `You survived to Wave ${wave}. Total Kills: ${totalKills}`;
+          zOverStats.textContent = `You reached Level ${currentLevel + 1}. Total Kills: ${totalKills}`;
           zOverOverlay.style.display = 'flex';
         }
         if(zOverBtn){
@@ -3110,25 +3564,40 @@
           };
         }
       } else if((!bossActive && zombiesRemaining === 0 && zombies.length === 0) || (bossActive && boss && boss._dead)){
-        if(nextWaveTimer <= 0){ nextWaveTimer = 2.0; SFX.play('roundWin'); }
-        nextWaveTimer -= gdt;
-        if(nextWaveTimer <= 0){ spawnNextWave(); }
-      }
+        // Level complete - activate exit door
+        if (!levelComplete) {
+          levelComplete = true;
+          if (exitDoor) exitDoor.active = true;
+          SFX.play('roundWin');
+        }
+        
+      // Check if players can exit
+      checkLevelExit();
+    }
+    
+    // Update level transition
+    updateLevelTransition(gdt);
 
       if(keys.has('r')||keys.has('R')){ startZombies(); }
     } else if(state==='z_over'){
+      if(keys.has('r')||keys.has('R')){ startZombies(); }
+    } else if(state==='z_complete'){
       if(keys.has('r')||keys.has('R')){ startZombies(); }
     }
 
     // HUD
     if(gameMode === 'zombies'){
-      if(state==='z_round' || state==='z_over'){
+      if(state==='z_round' || state==='z_over' || state==='z_complete'){
         const k1 = p1.zKills || 0;
         const k2 = p2.zKills || 0;
-        if(bossActive && boss && !boss._dead){
-          hud.textContent = `WAVE ${wave}  |  BOSS  |  K1: ${k1}  K2: ${k2}`;
+        if(state === 'z_complete'){
+          hud.textContent = `GAME COMPLETE!  |  K1: ${k1}  K2: ${k2}`;
+        } else if(bossActive && boss && !boss._dead){
+          hud.textContent = `LEVEL ${currentLevel + 1}  |  BOSS  |  K1: ${k1}  K2: ${k2}`;
+        } else if(levelComplete && exitDoor && exitDoor.active){
+          hud.textContent = `LEVEL ${currentLevel + 1}  |  EXIT DOOR OPEN  |  K1: ${k1}  K2: ${k2}`;
         } else {
-          hud.textContent = `WAVE ${wave}  |  Z LEFT: ${zombiesRemaining}  |  K1: ${k1}  K2: ${k2}`;
+          hud.textContent = `LEVEL ${currentLevel + 1}  |  Z LEFT: ${zombiesRemaining}  |  K1: ${k1}  K2: ${k2}`;
         }
       } else {
         hud.textContent = '';

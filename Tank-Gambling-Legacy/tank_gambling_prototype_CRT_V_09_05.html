@@ -18,6 +18,8 @@
       image-rendering: pixelated;
       filter: blur(0.2px);
     }
+
+    
     
     /* Balanced CRT scanlines with moderate glow */
     body::before {
@@ -761,6 +763,8 @@
   let bossActive = false; // true on boss waves while boss alive
   let currentZone = 0; // 0-based zone index
   let runZoneOrders = null; // per-run shuffled order for non-boss sub-levels
+  let hazards = []; // environmental hazards (damage-over-time)
+  let runSeed = (Date.now() & 0xffffffff);
   
   // Sidescroller level system
   let currentLevel = 0;
@@ -944,32 +948,92 @@
     if(isBossLevel(levelIndex)) return `${zoneName} — BOSS`;
     return zoneName;
   }
-  function generateWalls(levelIndex){
-    // Simple procedural walls: borders + some themed obstacles
+  // RNG helpers (per run/level)
+  function mulberry32(a){ return function(){ let t = a += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function getRngForLevel(levelIndex){ return mulberry32((runSeed ^ 0x9E3779B9) + levelIndex * 1013904223); }
+  function randRange(rng, min, max){ return min + Math.floor(rng() * (max - min + 1)); }
+  function generateLevelGeometry(levelIndex){
+    const rng = getRngForLevel(levelIndex);
+    const zoneIdx = getZoneIndex(levelIndex);
     const wallsOut = [
       {x: arenaPadding, y: arenaPadding, w: WT, h: innerH + WT},
       {x: arenaPadding + innerW - WT, y: arenaPadding, w: WT, h: innerH + WT},
       {x: arenaPadding, y: arenaPadding, w: innerW + WT, h: WT},
       {x: arenaPadding, y: arenaPadding + innerH - WT, w: innerW + WT, h: WT}
     ];
-    const zoneIdx = getZoneIndex(levelIndex);
-    const randBlocks = 6 + (zoneIdx % 3) * 2;
-    for(let i=0;i<randBlocks;i++){
-      const w = 30 + Math.floor(Math.random()*90);
-      const h = 20 + Math.floor(Math.random()*80);
-      const x = arenaPadding + 60 + Math.floor(Math.random() * (innerW - 120 - w));
-      const y = arenaPadding + 40 + Math.floor(Math.random() * (innerH - 80 - h));
-      wallsOut.push({ x, y, w, h });
+    const hazardsOut = [];
+    // Choose a layout pattern
+    const pattern = randRange(rng, 0, 2); // 0: pillars, 1: bars, 2: rooms
+    if(pattern === 0){
+      // Pillar grid (zone scaled)
+      const cols = 3 + (zoneIdx % 2);
+      const rows = 2 + (zoneIdx % 2);
+      for(let ci=1; ci<=cols; ci++){
+        for(let ri=1; ri<=rows; ri++){
+          const px = arenaPadding + Math.floor(ci * innerW/(cols+1)) - 15;
+          const py = arenaPadding + Math.floor(ri * innerH/(rows+1)) - 15;
+          wallsOut.push({ x: px, y: py, w: 30, h: 30 });
+        }
+      }
+    } else if(pattern === 1){
+      // Bars/corridors
+      const bars = 4 + (zoneIdx % 3);
+      for(let i=0;i<bars;i++){
+        const horizontal = rng() < 0.5;
+        if(horizontal){
+          const w = innerW - 200; const h = 12;
+          const x = arenaPadding + 100; const y = arenaPadding + randRange(rng, 60, innerH-60);
+          wallsOut.push({ x, y, w, h });
+        } else {
+          const w = 12; const h = innerH - 160;
+          const x = arenaPadding + randRange(rng, 120, innerW-120); const y = arenaPadding + 80;
+          wallsOut.push({ x, y, w, h });
+        }
+      }
+    } else {
+      // Rooms (two rectangles) and small obstacles
+      const rx = arenaPadding + randRange(rng, 80, innerW/2 - 120);
+      const ry = arenaPadding + randRange(rng, 60, innerH/2 - 100);
+      wallsOut.push({ x: rx, y: ry, w: 160, h: 100 });
+      const rx2 = arenaPadding + randRange(rng, innerW/2 + 40, innerW - 220);
+      const ry2 = arenaPadding + randRange(rng, innerH/2 - 40, innerH - 180);
+      wallsOut.push({ x: rx2, y: ry2, w: 160, h: 120 });
+      const small = 5 + (zoneIdx % 3);
+      for(let i=0;i<small;i++){
+        const w = randRange(rng, 20, 60); const h = randRange(rng, 20, 60);
+        const x = arenaPadding + randRange(rng, 40, innerW - 40 - w);
+        const y = arenaPadding + randRange(rng, 40, innerH - 40 - h);
+        wallsOut.push({ x, y, w, h });
+      }
     }
-    return wallsOut;
+    // Zone hazards
+    if(zoneIdx === 0){
+      // Acid pools
+      const pools = 2;
+      for(let i=0;i<pools;i++){
+        const w = 90, h = 50;
+        const x = arenaPadding + randRange(rng, 60, innerW - 60 - w);
+        const y = arenaPadding + randRange(rng, 40, innerH - 40 - h);
+        hazardsOut.push({ type: 'acid', x, y, w, h, dps: 0.2, color: '#00aa66' });
+      }
+    } else if(zoneIdx === 3){
+      // Shell craters (lava-ish)
+      const w = 70, h = 70;
+      const x = arenaPadding + randRange(rng, 80, innerW - 80 - w);
+      const y = arenaPadding + randRange(rng, 60, innerH - 60 - h);
+      hazardsOut.push({ type: 'lava', x, y, w, h, dps: 0.35, color: '#ff5500' });
+    }
+    return { walls: wallsOut, hazards: hazardsOut };
   }
   function ensureLevel(index){
     if(!levelData[index]){
       const bossHere = isBossLevel(index);
       const zoneIdx = getZoneIndex(index);
+      const geom = generateLevelGeometry(index);
       levelData[index] = {
         name: getLevelName(index),
-        walls: generateWalls(index),
+        walls: geom.walls,
+        hazards: geom.hazards,
         zombieCount: bossHere ? 0 : Math.max(3, 4 + Math.floor(index * 1.8)),
         isBoss: bossHere
       };
@@ -1044,6 +1108,7 @@
     // Clear zombies and bullets
     zombies = [];
     enemyTanks = [];
+    hazards = [];
     bullets = [];
     mines = [];
     boss = null;
@@ -1060,6 +1125,7 @@
       spawnLevelZombiesForZone(level.zombieCount, currentZone);
       spawnEnemyTanksForZone(currentZone);
     }
+    hazards = level.hazards || [];
     
     // Create doors
     createExitDoor();
@@ -3278,6 +3344,20 @@
       }
     }
 
+    // Hazards
+    if(gameMode === 'zombies' && hazards && hazards.length){
+      for(const hz of hazards){
+        ctx.save();
+        ctx.globalAlpha = 0.8;
+        ctx.shadowColor = hz.color || '#00aa66';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = hz.color || '#00aa66';
+        ctx.fillRect(hz.x, hz.y, hz.w, hz.h);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
+
     // Simple tanks with balanced CRT glow
     for(const t of players){
       if(!t.alive) continue;
@@ -3827,6 +3907,30 @@
             if(t.hp <= 0){ if(t.alive){ SFX.play('tankExplode'); spawnDeathExplosion(t.x, t.y); } t.alive=false; }
             if(b.pierce>0){ b.pierce--; } else { b._dead = true; }
             break;
+          }
+        }
+      }
+
+      // Hazards: apply DoT to players and zombies standing in them
+      if(hazards && hazards.length){
+        for(const hz of hazards){
+          const rx = hz.x, ry = hz.y, rw = hz.w, rh = hz.h;
+          // Players
+          for(const t of players){
+            if(!t.alive) continue;
+            if(t.x > rx && t.x < rx+rw && t.y > ry && t.y < ry+rh){
+              t.hp = Math.max(0, t.hp - (hz.dps || 0.2) * gdt);
+              t.showHpTimer = 0.5;
+              if(t.hp <= 0){ if(t.alive){ SFX.play('tankExplode'); spawnDeathExplosion(t.x, t.y); } t.alive=false; }
+            }
+          }
+          // Zombies
+          for(const z of zombies){
+            if(z._dead) continue;
+            if(z.x > rx && z.x < rx+rw && z.y > ry && z.y < ry+rh){
+              z.hp -= (hz.dps || 0.2) * gdt;
+              if(z.hp <= 0){ z._dead = true; zombiesRemaining = Math.max(0, zombiesRemaining - 1); }
+            }
           }
         }
       }

@@ -753,11 +753,13 @@
 
   // ---------- zombies mode state ----------
   let zombies = [];
+  let enemyTanks = [];
   let wave = 0;
   let zombiesRemaining = 0;
   let nextWaveTimer = 0;
   let boss = null; // active boss entity when present
   let bossActive = false; // true on boss waves while boss alive
+  let currentZone = 0; // 0-based zone index
   
   // Sidescroller level system
   let currentLevel = 0;
@@ -963,6 +965,7 @@
   function ensureLevel(index){
     if(!levelData[index]){
       const bossHere = isBossLevel(index);
+      const zoneIdx = getZoneIndex(index);
       levelData[index] = {
         name: getLevelName(index),
         walls: generateWalls(index),
@@ -1003,6 +1006,7 @@
     // Ensure this level exists (procedural beyond authored data)
     ensureLevel(levelIndex);
     currentLevel = levelIndex;
+    currentZone = getZoneIndex(currentLevel);
     levelComplete = false;
     const level = levelData[levelIndex];
     
@@ -1015,6 +1019,7 @@
     
     // Clear zombies and bullets
     zombies = [];
+    enemyTanks = [];
     bullets = [];
     mines = [];
     boss = null;
@@ -1023,11 +1028,12 @@
     // Spawn zombies or boss (force boss scheduling every 4th level)
     const bossHere = isBossLevel(levelIndex) || level.isBoss;
     if (bossHere) {
-      boss = makeBoss();
+      boss = makeBossForZone(currentZone);
       bossActive = true;
       zombiesRemaining = 0;
     } else {
-      spawnLevelZombies(level.zombieCount);
+      spawnLevelZombiesForZone(level.zombieCount, currentZone);
+      spawnEnemyTanksForZone(currentZone);
     }
     
     // Create doors
@@ -1045,14 +1051,15 @@
   }
   
   // Spawn zombies for current level
-  function spawnLevelZombies(count) {
+  function spawnLevelZombiesForZone(count, zoneIdx){
     zombies = [];
-    for(let i = 0; i < count; i++) {
-      // Spawn zombies on the right side of the level
+    for(let i=0;i<count;i++){
       let x = arenaPadding + innerW - 80 - (i * 40);
       let y = arenaPadding + 50 + Math.random() * (innerH - 100);
-      
-      const z = makeZombie(x, y);
+      const z = makeZombie(x,y);
+      if(zoneIdx >= 2){ // Zone 3+: faster zombies
+        z.thrust += 25 + zoneIdx * 5;
+      }
       zombies.push(z);
     }
     zombiesRemaining = zombies.length;
@@ -1103,6 +1110,10 @@
           transitionTimer = 0;
           // Load the next level
           loadLevel(nextLevelIndex);
+          // Zone 7: optional darkness FOV (placeholder toggle hook)
+          if(getZoneIndex(currentLevel) === 6){
+            // Future: enable darkness overlay
+          }
         }
         break;
         
@@ -1598,6 +1609,38 @@
     return { target, d2: bestD2 };
   }
 
+  function makeBossForZone(zoneIdx){
+    const b = makeBoss();
+    if(zoneIdx === 0){
+      // Zone 1: big zombie that spawns adds
+      b.color = '#66ff66';
+      b.spawnTimer = 0; b.spawnCd = 3.5;
+      b.updateExtra = (dt)=>{
+        b.spawnTimer = Math.max(0, b.spawnTimer - dt);
+        if(b.spawnTimer<=0){ b.spawnTimer = b.spawnCd; const z = makeZombie(b.x-20 + Math.random()*40, b.y-20+Math.random()*40); zombies.push(z); }
+      };
+    } else if(zoneIdx === 1){
+      // Zone 2: large tank with rotating perks (rapid fire / big bullets)
+      b.color = '#ff8800';
+      b.rotateTimer = 0; b.rotateCd = 5; b.mode = 'rapid';
+      b.updateExtra = (dt)=>{
+        b.rotateTimer = Math.max(0, b.rotateTimer - dt);
+        if(b.rotateTimer<=0){ b.rotateTimer = b.rotateCd; b.mode = (b.mode==='rapid')? 'big' : 'rapid'; }
+        if(b.mode==='rapid'){ b.shootCd = 0.55; b.shootBurst = 1; }
+        else { b.shootCd = 1.35; b.shootBurst = 1; b.extraBullet = { r: 8, damage: 2 }; }
+      };
+    } else if(zoneIdx === 2){
+      // Zone 3: slow high hp walker, spawns swarm on death
+      b.color = '#cc0000'; b.thrust = 55; b.hp = b.maxHp = Math.ceil(b.maxHp*1.25);
+      b.onDeath = ()=>{ for(let i=0;i<8;i++){ const z=makeZombie(b.x + Math.random()*40-20, b.y+Math.random()*40-20); z.thrust += 30; zombies.push(z);} };
+    } else if(zoneIdx === 3){
+      // Zone 4: tiny evasive tank with massive bullets
+      b.size = 34; b.color = '#ffff00'; b.shootCd = 1.8; b.thrust = 120;
+      b.tiny = true; b.massive = true;
+    }
+    return b;
+  }
+
   function makeBoss(){
     // Boss spawns on right side mid
     const x = arenaPadding + innerW - 40;
@@ -1660,7 +1703,74 @@
         });
       }
     }
+    // Zone-specific extras
+    if(boss.updateExtra) boss.updateExtra(dt);
+
+    // bullets vs zombies (humans bullets only)
+    for(const b of bullets){
+      if(b._dead) continue;
+      if(b.ownerTeam !== 'humans') continue;
+      for(const z of zombies){
+        if(z._dead) continue;
+        if(circleHit(b.x,b.y,b.r, z.x,z.y,z.size/2)){
+          z.hp -= b.damage; SFX.play('hit');
+          if(z.hp <= 0){
+            z._dead = true;
+            zombiesRemaining = Math.max(0, zombiesRemaining - 1);
+            const killer = b.owner;
+            if(killer){
+              killer.zKills = (killer.zKills||0) + 1;
+              if(!killer.zPerkThreshold) killer.zPerkThreshold = 5;
+              if(!killer.zDraftOpen && killer.zKills >= killer.zPerkThreshold){
+                killer.zDraftOpen = true;
+                showDraft(killer, `Player ${killer===p1?1:2} — choose an upgrade`, ()=>{
+                  killer.zDraftOpen = false;
+                  // Gradual linear-increasing increments for mines credit path
+                  const inc = (killer.zIncCurrent||3);
+                  const step = (killer.zIncStep||2);
+                  killer.zIncCurrent = inc + step;
+                  killer.zPerkThreshold += killer.zIncCurrent;
+                });
+              }
+              refreshKills();
+            }
+          }
+        }
+      }
+    }
+
+    // bullets vs enemy tanks (humans only)
+    for(const b of bullets){
+      if(b._dead) continue;
+      if(b.ownerTeam !== 'humans') continue;
+      for(const e of enemyTanks){
+        if(e._dead) continue;
+        if(circleHit(b.x,b.y,b.r, e.x,e.y,e.size/2)){
+          e.hp -= b.damage; SFX.play('hit');
+          if(e.hp <= 0){ e._dead = true; createExplosion(e.x, e.y, 1); }
+          if(b.pierce>0){ b.pierce--; } else { b._dead = true; }
+          break;
+        }
+      }
+    }
+
+    // boss/enemy bullets vs players (damage humans)
+    for(const b of bullets){
+      if(b._dead) continue;
+      if(b.ownerTeam === 'humans') continue;
+      for(const t of players){
+        if(!t.alive) continue;
+        if(circleHit(b.x,b.y,b.r, t.x,t.y,t.size/2)){
+          t.hp = Math.max(0, t.hp - (b.damage || 1));
+          t.showHpTimer = 1.0; SFX.play('hit'); screenShake = Math.max(screenShake, 0.1);
+          if(t.hp <= 0){ if(t.alive){ SFX.play('tankExplode'); spawnDeathExplosion(t.x, t.y); } t.alive=false; }
+          if(b.pierce>0){ b.pierce--; } else { b._dead = true; }
+          break;
+        }
+      }
+    }
   }
+
   function makeZombie(x,y){
     return {
       x, y, size: 26, a: 0,
@@ -1733,7 +1843,7 @@
     boss = null; bossActive = false;
     const isBossWave = (wave % 5) === 0;
     if(isBossWave){
-      boss = makeBoss(); bossActive = true; SFX.play('bossSpawn'); SFX.play('bossRoar');
+      boss = makeBossForZone(currentZone); bossActive = true; SFX.play('bossSpawn'); SFX.play('bossRoar');
       // Brief boss wave banner for clarity
       if(msg){
         msg.style.display = 'block';
@@ -2963,6 +3073,33 @@
       }
     }
 
+    // Enemy tanks (render under players, above zombies)
+    if(gameMode === 'zombies'){
+      for(const e of enemyTanks){
+        if(e._dead) continue;
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.rotate(e.a || 0);
+        ctx.shadowColor = e.color;
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = e.color;
+        ctx.fillRect(-e.size/2, -e.size/2, e.size, e.size);
+        ctx.shadowBlur = 0;
+        // Barrel
+        ctx.fillStyle = '#ddd';
+        ctx.fillRect(0, -3, e.size*0.6, 6);
+        ctx.restore();
+        // Health bar
+        if(e.hp < (e.variant==='heavy'?6:3)){
+          const maxHp = (e.variant==='heavy'?6:3);
+          ctx.fillStyle='#000';
+          ctx.fillRect(e.x-16, e.y-e.size/2-10, 32, 5);
+          ctx.fillStyle=e.color;
+          ctx.fillRect(e.x-16, e.y-e.size/2-10, 32*(e.hp/Math.max(1,maxHp)), 5);
+        }
+      }
+    }
+
     // Boss render and top health bar
     if(gameMode === 'zombies' && bossActive && boss && !boss._dead){
       // Boss body
@@ -3454,6 +3591,8 @@
       }
       updateParticles(gdt);
       if(bossActive){ updateBoss(gdt); }
+      // update enemy tanks in zombies mode
+      if(enemyTanks && enemyTanks.length){ updateEnemyTanks(gdt); }
       if(deathAnim.active){ deathAnim.t += dt; if(deathAnim.t >= deathAnim.duration){ deathAnim.active = false; } }
 
       // bullets integrate and collide with arena/walls
@@ -3652,7 +3791,7 @@
             startZombies();
           };
         }
-      } else if((!bossActive && zombiesRemaining === 0 && zombies.length === 0) || (bossActive && boss && boss._dead)){
+      } else if((!bossActive && zombiesRemaining === 0 && zombies.length === 0 && enemyTanks.length === 0) || (bossActive && boss && boss._dead)){
         // Level complete - activate exit door
         if (!levelComplete) {
           levelComplete = true;
@@ -3777,6 +3916,71 @@
       
       perkCol.appendChild(col);
     }
+  }
+
+  // ----- Enemies per Zone -----
+  function spawnEnemyTanksForZone(zoneIdx){
+    enemyTanks = [];
+    if(zoneIdx === 1){ // Zone 2 — basic enemy tanks
+      enemyTanks.push(makeEnemyTank(arenaPadding + innerW - 120, arenaPadding + innerH*0.3, 'light'));
+      enemyTanks.push(makeEnemyTank(arenaPadding + innerW - 160, arenaPadding + innerH*0.7, 'light'));
+    }
+    if(zoneIdx === 3){ // Zone 4 — heavy tanks with slow big bullets
+      enemyTanks.push(makeEnemyTank(arenaPadding + innerW - 140, arenaPadding + innerH*0.5, 'heavy'));
+    }
+  }
+  function makeEnemyTank(x,y,variant){
+    return {
+      x, y, size: 30, a: 0,
+      thrust: variant==='heavy'? 70 : 110,
+      rotSpeed: 1.8,
+      hp: variant==='heavy'? 6 : 3,
+      shootCd: variant==='heavy'? 1.6 : 1.0,
+      shootTimer: 0,
+      bulletSpeed: variant==='heavy'? 260 : 360,
+      bulletDamage: variant==='heavy'? 2 : 1,
+      bulletR: variant==='heavy'? 7 : 5,
+      color: variant==='heavy'? '#ffaa00' : '#ff4444',
+      variant,
+      _dead: false
+    };
+  }
+  function updateEnemyTanks(dt){
+    for(const e of enemyTanks){
+      if(e._dead) continue;
+      // Seek nearest living player
+      const nd = nearestLivingPlayer(e.x, e.y);
+      if(nd.target){
+        const desired = Math.atan2(nd.target.y - e.x + 0*(e.y), nd.target.x - e.x);
+        const desiredA = Math.atan2(nd.target.y - e.y, nd.target.x - e.x);
+        let d = desiredA - e.a; while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2;
+        const turn = e.rotSpeed * dt; e.a += Math.max(-turn, Math.min(turn, d));
+        const nx = e.x + Math.cos(e.a) * e.thrust * dt;
+        const ny = e.y + Math.sin(e.a) * e.thrust * dt;
+        const probe = { x: nx, y: ny, size: e.size };
+        resolveTankCollisions(probe); e.x = probe.x; e.y = probe.y;
+        e.shootTimer = Math.max(0, e.shootTimer - dt);
+        if(e.shootTimer <= 0){
+          e.shootTimer = e.shootCd;
+          const a = Math.atan2(nd.target.y - e.y, nd.target.x - e.x);
+          bullets.push({
+            x: e.x + Math.cos(a)*e.size*0.6,
+            y: e.y + Math.sin(a)*e.size*0.6,
+            vx: Math.cos(a)*e.bulletSpeed,
+            vy: Math.sin(a)*e.bulletSpeed,
+            r: e.bulletR,
+            damage: e.bulletDamage,
+            maxBounces: 0,
+            pierce: 0,
+            color: e.variant==='heavy' ? '#ffaa00' : '#ff4444',
+            owner: e,
+            ownerTeam: 'enemies'
+          });
+        }
+      }
+    }
+    // Cull dead
+    enemyTanks = enemyTanks.filter(e=>!e._dead);
   }
 
 })();

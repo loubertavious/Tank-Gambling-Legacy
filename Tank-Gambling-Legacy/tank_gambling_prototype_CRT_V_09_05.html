@@ -555,6 +555,14 @@
       if(ctx) return;
       try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
     }
+    async function resume(){
+      ensure();
+      try {
+        if(ctx && ctx.state !== 'running'){
+          await ctx.resume();
+        }
+      } catch(e){}
+    }
     
     // Load music track
     function loadMusic(name, url) {
@@ -669,7 +677,7 @@
         currentTrack.volume = (muted || musicMuted) ? 0 : musicVolume;
       }
     }
-    return { ensure, play, setMuted, isMuted, loadMusic, playMusic, stopMusic, setMusicVolume, toggleMusicMute };
+    return { ensure, resume, play, setMuted, isMuted, loadMusic, playMusic, stopMusic, setMusicVolume, toggleMusicMute };
   })();
 
   // ---------- Music Loading ----------
@@ -685,9 +693,10 @@
   let musicStarted = false;
   
   // Start music on first user interaction
-  function startMusicOnInteraction() {
+  async function startMusicOnInteraction() {
     if (!musicStarted) {
       musicStarted = true;
+      await SFX.resume();
       SFX.playMusic('background');
       console.log('Music started on user interaction');
       
@@ -715,8 +724,16 @@
   });
   window.addEventListener('keyup',   e=> { keys.delete(e.key); });
   
-  // Also start music on mouse click
-  window.addEventListener('click', startMusicOnInteraction);
+  // Also start music on common user interactions (desktop/mobile)
+  ['click','pointerdown','touchstart'].forEach(ev=>{
+    window.addEventListener(ev, startMusicOnInteraction, { passive: true, once: false });
+  });
+  // Try resuming audio when tab becomes visible
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'visible'){
+      SFX.resume();
+    }
+  });
 
   // ---------- game config ----------
   const ROUND_WINS = 5;

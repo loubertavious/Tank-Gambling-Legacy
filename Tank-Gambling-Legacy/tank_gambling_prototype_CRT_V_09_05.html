@@ -1050,7 +1050,8 @@
     bossActive = false;
     
     // Spawn zombies or boss (force boss scheduling every 4th level)
-    const bossHere = isBossLevel(actualIndex) || level.isBoss;
+    // Force bosses only every 4th level (ignore authored isBoss flags)
+    const bossHere = isBossLevel(actualIndex);
     if (bossHere) {
       boss = makeBossForZone(currentZone);
       bossActive = true;

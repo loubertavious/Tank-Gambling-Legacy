@@ -1614,7 +1614,9 @@
     if(zoneIdx === 0){
       // Zone 1: big zombie that spawns adds
       b.color = '#66ff66';
-      b.spawnTimer = 0; b.spawnCd = 3.5;
+      // Soften: lower HP and slow add spawns
+      b.hp = b.maxHp = Math.ceil(b.maxHp * 0.75);
+      b.spawnTimer = 0; b.spawnCd = 5.0;
       b.updateExtra = (dt)=>{
         b.spawnTimer = Math.max(0, b.spawnTimer - dt);
         if(b.spawnTimer<=0){ b.spawnTimer = b.spawnCd; const z = makeZombie(b.x-20 + Math.random()*40, b.y-20+Math.random()*40); zombies.push(z); }
@@ -1627,7 +1629,7 @@
         b.rotateTimer = Math.max(0, b.rotateTimer - dt);
         if(b.rotateTimer<=0){ b.rotateTimer = b.rotateCd; b.mode = (b.mode==='rapid')? 'big' : 'rapid'; }
         if(b.mode==='rapid'){ b.shootCd = 0.55; b.shootBurst = 1; }
-        else { b.shootCd = 1.35; b.shootBurst = 1; b.extraBullet = { r: 8, damage: 2 }; }
+        else { b.shootCd = 1.35; b.shootBurst = 1; b.extraBullet = { r: 8, damage: 1.0 }; }
       };
     } else if(zoneIdx === 2){
       // Zone 3: slow high hp walker, spawns swarm on death
@@ -1651,7 +1653,7 @@
       thrust: 70, rotSpeed: 1.4,
       hp: baseHp, maxHp: baseHp,
       shootTimer: 0, shootCd: 1.25,
-      touchDamage: 1.0, touchCooldown: 0.9, touchTimer: 0,
+      touchDamage: 0.5, touchCooldown: 1.0, touchTimer: 0,
       color: '#ff00aa', _dead: false
     };
   }
@@ -1693,11 +1695,13 @@
       const spread = 12 * Math.PI/180;
       const angles = [base, base+spread, base-spread];
       for(const a of angles){
+        const r = (boss.extraBullet && boss.extraBullet.r) ? boss.extraBullet.r : (boss.massive ? 9 : 6);
+        const damage = (boss.extraBullet && boss.extraBullet.damage) ? boss.extraBullet.damage : (boss.massive ? 1.5 : 0.75);
         bullets.push({
           x: boss.x + Math.cos(a)*boss.size*0.6,
           y: boss.y + Math.sin(a)*boss.size*0.6,
           vx: Math.cos(a)*300, vy: Math.sin(a)*300,
-          r: 6, damage: 1,
+          r, damage,
           maxBounces: 1, pierce: 0,
           color: '#ff00aa', owner: boss, ownerTeam: 'boss'
         });

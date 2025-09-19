@@ -952,11 +952,24 @@
   function mulberry32(a){ return function(){ let t = a += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function getRngForLevel(levelIndex){ return mulberry32((runSeed ^ 0x9E3779B9) + levelIndex * 1013904223); }
   function randRange(rng, min, max){ return min + Math.floor(rng() * (max - min + 1)); }
+  function rectsIntersect(a,b){ return !(a.x+a.w < b.x || b.x+b.w < a.x || a.y+a.h < b.y || b.y+b.h < a.y); }
+  function carveWalls(walls, carves){
+    if(!carves || !carves.length) return walls;
+    const out = [];
+    for(const w of walls){
+      let keep = true;
+      for(const c of carves){ if(rectsIntersect(w,c)){ keep = false; break; } }
+      if(keep) out.push(w);
+    }
+    return out;
+  }
   function generateLevelGeometry(levelIndex){
     const rng = getRngForLevel(levelIndex);
     const zoneIdx = getZoneIndex(levelIndex);
     const boss = isBossLevel(levelIndex);
-    const density = boss ? 1 : 1.6; // non-boss maps get more objects
+    const sub = levelIndex % 4; // 0..2 within zone, 3 is boss
+    // Scale density by zone and sub-level, clamp to avoid overfill
+    const density = boss ? 1 : Math.min(2.2, 1.1 + 0.22*zoneIdx + 0.12*sub);
     const wallsOut = [
       {x: arenaPadding, y: arenaPadding, w: WT, h: innerH + WT},
       {x: arenaPadding + innerW - WT, y: arenaPadding, w: WT, h: innerH + WT},
@@ -1026,10 +1039,19 @@
         }
       }
     }
+    // Carve guaranteed entrance/exit and a mid corridor to maintain flow
+    const carves = [];
+    // Entrance corridor (left)
+    carves.push({ x: arenaPadding + 10, y: arenaPadding + 30, w: 150, h: innerH - 60 });
+    // Exit corridor (right)
+    carves.push({ x: arenaPadding + innerW - 160, y: arenaPadding + 30, w: 150, h: innerH - 60 });
+    // Mid horizontal corridor
+    carves.push({ x: arenaPadding + 140, y: arenaPadding + Math.floor(innerH/2) - 28, w: innerW - 280, h: 56 });
+    const carvedWalls = carveWalls(wallsOut, carves);
     // Zone hazards
     if(zoneIdx === 0){
       // Acid pools
-      const pools = 2;
+      const pools = boss ? 1 : Math.min(3, 1 + Math.round(1 * density));
       for(let i=0;i<pools;i++){
         const w = 90, h = 50;
         const x = arenaPadding + randRange(rng, 60, innerW - 60 - w);
@@ -1038,12 +1060,15 @@
       }
     } else if(zoneIdx === 3){
       // Shell craters (lava-ish)
-      const w = 70, h = 70;
-      const x = arenaPadding + randRange(rng, 80, innerW - 80 - w);
-      const y = arenaPadding + randRange(rng, 60, innerH - 60 - h);
-      hazardsOut.push({ type: 'lava', x, y, w, h, dps: 0.35, color: '#ff5500' });
+      const craterCount = boss ? 1 : 1 + Math.round(0.5 * density);
+      for(let i=0;i<craterCount;i++){
+        const w = 70, h = 70;
+        const x = arenaPadding + randRange(rng, 80, innerW - 80 - w);
+        const y = arenaPadding + randRange(rng, 60, innerH - 60 - h);
+        hazardsOut.push({ type: 'lava', x, y, w, h, dps: 0.3, color: '#ff5500' });
+      }
     }
-    return { walls: wallsOut, hazards: hazardsOut };
+    return { walls: carvedWalls, hazards: hazardsOut };
   }
   function ensureLevel(index){
     if(!levelData[index]){
@@ -1118,8 +1143,14 @@
     levelComplete = false;
     const level = levelData[actualIndex];
     
-    // Set walls for this level
-    walls = [...level.walls];
+    // Set walls for this level (prefer maze for non-boss levels)
+    if (!isBossLevel(actualIndex)){
+      const sub = actualIndex % 4; // 0..2
+      const open = 0.05 + 0.08*currentZone + 0.05*sub;
+      genMaze(open);
+    } else {
+      walls = [...level.walls];
+    }
     
     // Position players at the left side
     p1.x = arenaPadding + 50; p1.y = arenaPadding + innerH * 0.33; p1.a = 0;
@@ -1266,7 +1297,7 @@
   }
 
   // ---------- maze ----------
-  function genMaze(){
+  function genMaze(openness){
     const cells = Array.from({length:ROWS},()=>Array.from({length:COLS},()=>({v:false,w:{N:1,E:1,S:1,W:1}})));
     const stack=[]; let cx=0, cy=0; cells[cy][cx].v=true; stack.push([cx,cy]);
     const dirs = [[0,-1,'N','S'],[1,0,'E','W'],[0,1,'S','N'],[-1,0,'W','E']];
@@ -1281,9 +1312,10 @@
     }
     
     // Introduce additional openings to create multiple paths (loops)
+    const openChance = Math.max(0, Math.min(0.6, (openness!=null?openness:0) + LOOP_CHANCE));
     for(let y=0;y<ROWS;y++){
       for(let x=0;x<COLS;x++){
-        if(Math.random() < LOOP_CHANCE){
+        if(Math.random() < openChance){
           const openable = [];
           // Only consider internal walls (E,S) to avoid outer border removal
           if(x < COLS-1 && cells[y][x].w.E === 1) openable.push('E');
@@ -1957,7 +1989,10 @@
   function spawnNextWave(){
     wave += 1;
     // Regenerate maze so the map changes each wave
-    genMaze();
+    const zone = getZoneIndex(wave-1);
+    const sub = (wave-1) % 4;
+    const openness = 0.05 + 0.08*zone + 0.05*sub; // higher = more open
+    genMaze(openness);
     // Reposition players on the left side, facing right
     p1.x = arenaPadding + CW*0.5; p1.y = arenaPadding + innerH * 0.33; p1.a = 0; p1.alive = true; p1.hp = p1.maxHp; p1.showHpTimer = 1.0;
     p2.x = arenaPadding + CW*0.5; p2.y = arenaPadding + innerH * 0.66; p2.a = 0; p2.alive = true; p2.hp = p2.maxHp; p2.showHpTimer = 1.0;
@@ -3896,6 +3931,21 @@
       }
       zombies = zombies.filter(z=>!z._dead || z.hp>0);
 
+      // bullets vs enemy tanks (humans bullets only)
+      for(const b of bullets){
+        if(b._dead) continue;
+        if(b.ownerTeam !== 'humans') continue;
+        for(const e of enemyTanks){
+          if(e._dead) continue;
+          if(circleHit(b.x,b.y,b.r, e.x,e.y,e.size/2)){
+            e.hp -= b.damage; SFX.play('hit');
+            if(e.hp <= 0){ e._dead = true; createExplosion(e.x, e.y, 1); }
+            if(b.pierce>0){ b.pierce--; } else { b._dead = true; }
+            break;
+          }
+        }
+      }
+
       // bullets vs boss (humans bullets only)
       if(bossActive && boss && !boss._dead){
         for(const b of bullets){
@@ -4117,13 +4167,13 @@
   function makeEnemyTank(x,y,variant){
     return {
       x, y, size: 30, a: 0,
-      thrust: variant==='heavy'? 70 : 110,
+      thrust: variant==='heavy'? 60 : 95,
       rotSpeed: 1.8,
-      hp: variant==='heavy'? 6 : 3,
-      shootCd: variant==='heavy'? 1.6 : 1.0,
+      hp: variant==='heavy'? 5 : 2,
+      shootCd: variant==='heavy'? 1.8 : 1.1,
       shootTimer: 0,
-      bulletSpeed: variant==='heavy'? 260 : 360,
-      bulletDamage: variant==='heavy'? 2 : 1,
+      bulletSpeed: variant==='heavy'? 240 : 330,
+      bulletDamage: variant==='heavy'? 1.5 : 0.75,
       bulletR: variant==='heavy'? 7 : 5,
       color: variant==='heavy'? '#ffaa00' : '#ff4444',
       variant,

@@ -18,7 +18,7 @@
       image-rendering: pixelated;
       filter: blur(0.2px);
     }
-
+    
     
     
     /* Balanced CRT scanlines with moderate glow */
@@ -1152,7 +1152,7 @@
       const open = 0.05 + 0.08*currentZone + 0.05*sub;
       genMaze(open);
     } else {
-      walls = [...level.walls];
+    walls = [...level.walls];
     }
     
     // Position players at the left side
@@ -2384,7 +2384,8 @@
 
     const rollRarity=()=>{ const r=Math.random(); if(r<0.02) return 'mythical'; if(r<0.10) return 'legendary'; if(r<0.35) return 'rare'; return 'common'; };
     const pickByRarity=(rar)=>{ const pool=upgradePool.filter(u=>u.rarity===rar); return pool.length?choice(pool):choice(upgradePool); };
-    const fmt=(up)=>`<div style="font-weight:bold;margin-bottom:4px;font-size:12px;font-family:'Press Start 2P',monospace;color:${up.color||'#fff'}">${up.name}</div><div style="font-size:10px;color:#00ff88;font-family:'Press Start 2P',monospace;">${up.good}</div><div style="font-size:10px;color:#ff4444;font-family:'Press Start 2P',monospace;">${up.bad}</div>`;
+    const rarityColor=(rar)=>{ switch(rar){ case 'rare': return '#00aaff'; case 'legendary': return '#ffdd00'; case 'mythical': return '#ffff00'; default: return '#ffffff'; } };
+    const fmt=(up)=>`<div style="font-weight:bold;margin-bottom:4px;font-size:12px;font-family:'Press Start 2P',monospace;color:${rarityColor(up.rarity)}">${up.name}</div><div style="font-size:10px;color:#00ff88;font-family:'Press Start 2P',monospace;">${up.good}</div><div style="font-size:10px;color:#ff4444;font-family:'Press Start 2P',monospace;">${up.bad}</div>`;
     const enableTake=(en)=>{ takeBtn.disabled=!en; takeBtn.style.border=en?`3px solid ${playerColor}`:'3px solid #888'; takeBtn.style.color=en?'#fff':'#888'; takeBtn.style.background=en?'#000':'#111'; takeBtn.style.cursor=en?'pointer':'not-allowed'; };
     const enableMyth=(en)=>{ mythBtn.disabled=!en; mythBtn.style.border=en?'3px solid #ffff00':'3px solid #888'; mythBtn.style.color=en?'#ffff00':'#888'; mythBtn.style.background=en?'#000':'#111'; mythBtn.style.cursor=en?'pointer':'not-allowed'; };
     let spinning=false; let finalPicks=[];
@@ -2399,41 +2400,45 @@
           const rar=rollRarity(); const up=pickByRarity(rar);
           const cell=document.createElement('div');
           Object.assign(cell.style,{height:cellH+'px',display:'flex',alignItems:'center',justifyContent:'center'});
-          cell.innerHTML = `<div style="margin-top:6px;font-weight:bold;font-size:12px;font-family:'Press Start 2P',monospace;color:${up.color||'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92%;">${up.name}</div>`;
+          cell.innerHTML = `<div style=\"width:100%;text-align:center;margin-top:600px;font-weight:bold;font-size:12px;font-family:'Press Start 2P',monospace;color:${rarityColor(up.rarity)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92%;\">${up.name}</div>`;
           cell._perk = up; r._strip.appendChild(cell); r._cells.push(cell);
         }
         r._strip.style.transform = 'translateY(0px)';
       }
-      // Spin all reels together
-      const t0 = performance.now(); const spinDur = 2000; const easeOut = t=>1-Math.pow(1-t,3);
+      // Spin with sequential stops per reel
+      const startTime = performance.now();
+      const baseDur = 3000; // slower overall duration
+      const stagger = 600;  // longer delay between reel stops
+      const easeOut = t=>1-Math.pow(1-t,3);
       await new Promise(res=>{
+        const stopAt = reels.map((_,i)=> startTime + baseDur + i*stagger);
+        const done = reels.map(()=>false);
         function step(){
-          const t = Math.min(1,(performance.now()-t0)/spinDur); const e=easeOut(t);
+          const now = performance.now();
+          let allDone = true;
           reels.forEach((r,idx)=>{
-            const baseSpeed = 9 + idx*1.5; // slower base speed
-            r._pos = (r._pos + baseSpeed*(1-e));
-            // wrap
-            if(r._pos > r._cells.length*1){ r._pos = r._pos % r._cells.length; }
+            if(done[idx]) return; allDone=false;
+            const localDur = baseDur + idx*stagger;
+            const localT = Math.min(1, (now - startTime) / localDur);
+            const spd = (6 + idx*0.9) * (1 - easeOut(localT));
+            r._pos = (r._pos + Math.max(0.10, spd));
+            if(r._pos > r._cells.length){ r._pos = r._pos % r._cells.length; }
             const y = -((r._pos % r._cells.length)*cellH);
             r._strip.style.transform = `translateY(${y}px)`;
-            if(Math.floor(r._pos*0.5) !== Math.floor((r._pos-baseSpeed*(1-e))*0.5)){
-              SFX.play('slotTick');
+            if(Math.floor(r._pos*0.5) !== r._lastTick){ SFX.play('slotTick'); r._lastTick = Math.floor(r._pos*0.5); }
+            if(now >= stopAt[idx]){
+              const stopIndex = (Math.floor(r._pos)+idx*2) % r._cells.length;
+              const cell = r._cells[stopIndex]; const up = cell?cell._perk:pickByRarity(rollRarity());
+              r._strip.innerHTML = `<div style=\"height:100%;display:flex;align-items:center;justify-content:center\"><div style=\"width:100%;text-align:center;margin-top:6px;font-weight:bold;font-size:12px;font-family:'Press Start 2P',monospace;color:${rarityColor(up.rarity)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92%;\">${up.name}</div></div>`;
+              r._strip.style.transform = 'translateY(0)';
+              r._value = up; finalPicks[idx]=up; SFX.play('slotStop');
+              done[idx]=true;
             }
           });
-          if(t<1) requestAnimationFrame(step); else res();
+          if(allDone){ res(); } else { requestAnimationFrame(step); }
         }
         requestAnimationFrame(step);
       });
-      // Snap each reel to a final cell and show full perk details
-      reels.forEach((r,idx)=>{
-        const stopIndex = (Math.floor(r._pos)+idx*2) % r._cells.length;
-        const cell = r._cells[stopIndex]; const up = cell?cell._perk:pickByRarity(rollRarity());
-        r._strip.innerHTML = `<div style="height:100%;display:flex;align-items:center;justify-content:center"><div style=\"margin-top:6px;font-weight:bold;font-size:12px;font-family:'Press Start 2P',monospace;color:${up.color||'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92%;\">${up.name}</div></div>`;
-        r._strip.style.transform = 'translateY(0)';
-        r._value = up; finalPicks[idx]=up;
-        SFX.play('slotStop');
-      });
-      // little completion chime after all reels stop
       SFX.play('slotFinish');
       const counts={}; for(const up of finalPicks){ counts[up.name]=(counts[up.name]||0)+1; }
       let jackpot=false; Object.values(counts).forEach(c=>{ if(c>=3) jackpot=true; });
@@ -2463,7 +2468,10 @@
         const k = e.key;
         if(leftKeys.includes(k)){ selectedReel = (selectedReel + reels.length - 1) % reels.length; updateHighlight(); updateInfo(); }
         else if(rightKeys.includes(k)){ selectedReel = (selectedReel + 1) % reels.length; updateHighlight(); updateInfo(); }
-        else if(k === confirmKey1 || k === confirmKey2){ if(takeBtn.disabled) return; const up=finalPicks[selectedReel]; if(!up) return; SFX.play('menuSelect'); applyUpgrade(player,up); try{document.body.removeChild(wrapper);}catch(_e){} paused=prevPaused; onDone&&onDone(); }
+        else if(k === confirmKey1 || k === confirmKey2){ 
+          if(takeBtn.disabled){ if(!spinning) { spinBtn.onclick(); } return; }
+          const up=finalPicks[selectedReel]; if(!up) return; SFX.play('menuSelect'); applyUpgrade(player,up); try{document.body.removeChild(wrapper);}catch(_e){} paused=prevPaused; onDone&&onDone(); 
+        }
       };
     }
     const keyHandler = (player.control === 'P1')
@@ -2485,7 +2493,12 @@
         const rightEdge = (!prev.right && right) || (prev.axisX <= -0.5 && ax >= 0.5);
         if(leftEdge){ selectedReel=(selectedReel+reels.length-1)%reels.length; updateHighlight(); updateInfo(); }
         else if(rightEdge){ selectedReel=(selectedReel+1)%reels.length; updateHighlight(); updateInfo(); }
-        if(!prev.select && select && !takeBtn.disabled){ const up=finalPicks[selectedReel]; if(up){ SFX.play('menuSelect'); applyUpgrade(player,up); try{document.body.removeChild(wrapper);}catch(_e){} paused=prevPaused; onDone&&onDone(); return; } }
+        if(!prev.select && select){
+          if(takeBtn.disabled){ if(!spinning){ spinBtn.onclick(); } }
+          else {
+            const up=finalPicks[selectedReel]; if(up){ SFX.play('menuSelect'); applyUpgrade(player,up); try{document.body.removeChild(wrapper);}catch(_e){} paused=prevPaused; onDone&&onDone(); return; }
+          }
+        }
         prev = { left, right, select, axisX: ax };
       }
       requestAnimationFrame(pollDraftGp);

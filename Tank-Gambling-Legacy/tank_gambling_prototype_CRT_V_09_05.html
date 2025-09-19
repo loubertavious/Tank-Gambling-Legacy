@@ -955,6 +955,8 @@
   function generateLevelGeometry(levelIndex){
     const rng = getRngForLevel(levelIndex);
     const zoneIdx = getZoneIndex(levelIndex);
+    const boss = isBossLevel(levelIndex);
+    const density = boss ? 1 : 1.6; // non-boss maps get more objects
     const wallsOut = [
       {x: arenaPadding, y: arenaPadding, w: WT, h: innerH + WT},
       {x: arenaPadding + innerW - WT, y: arenaPadding, w: WT, h: innerH + WT},
@@ -966,8 +968,8 @@
     const pattern = randRange(rng, 0, 2); // 0: pillars, 1: bars, 2: rooms
     if(pattern === 0){
       // Pillar grid (zone scaled)
-      const cols = 3 + (zoneIdx % 2);
-      const rows = 2 + (zoneIdx % 2);
+      const cols = Math.max(2, Math.round((3 + (zoneIdx % 2)) * density));
+      const rows = Math.max(2, Math.round((2 + (zoneIdx % 2)) * density));
       for(let ci=1; ci<=cols; ci++){
         for(let ri=1; ri<=rows; ri++){
           const px = arenaPadding + Math.floor(ci * innerW/(cols+1)) - 15;
@@ -977,7 +979,7 @@
       }
     } else if(pattern === 1){
       // Bars/corridors
-      const bars = 4 + (zoneIdx % 3);
+      const bars = Math.max(4, Math.round((4 + (zoneIdx % 3)) * density));
       for(let i=0;i<bars;i++){
         const horizontal = rng() < 0.5;
         if(horizontal){
@@ -998,12 +1000,30 @@
       const rx2 = arenaPadding + randRange(rng, innerW/2 + 40, innerW - 220);
       const ry2 = arenaPadding + randRange(rng, innerH/2 - 40, innerH - 180);
       wallsOut.push({ x: rx2, y: ry2, w: 160, h: 120 });
-      const small = 5 + (zoneIdx % 3);
+      const small = Math.max(5, Math.round((5 + (zoneIdx % 3)) * density));
       for(let i=0;i<small;i++){
         const w = randRange(rng, 20, 60); const h = randRange(rng, 20, 60);
         const x = arenaPadding + randRange(rng, 40, innerW - 40 - w);
         const y = arenaPadding + randRange(rng, 40, innerH - 40 - h);
         wallsOut.push({ x, y, w, h });
+      }
+    }
+    // Extra random cover stubs on non-boss maps
+    if(!boss){
+      const stubs = randRange(rng, 2, 4);
+      for(let i=0;i<stubs;i++){
+        const horizontal = rng() < 0.5;
+        if(horizontal){
+          const w = randRange(rng, 40, 120); const h = 10;
+          const x = arenaPadding + randRange(rng, 40, innerW - 40 - w);
+          const y = arenaPadding + randRange(rng, 50, innerH - 50 - h);
+          wallsOut.push({ x, y, w, h });
+        } else {
+          const w = 10; const h = randRange(rng, 40, 120);
+          const x = arenaPadding + randRange(rng, 50, innerW - 50 - w);
+          const y = arenaPadding + randRange(rng, 40, innerH - 40 - h);
+          wallsOut.push({ x, y, w, h });
+        }
       }
     }
     // Zone hazards

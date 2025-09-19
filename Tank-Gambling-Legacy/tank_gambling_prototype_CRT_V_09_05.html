@@ -1122,7 +1122,8 @@
       bossActive = true;
       zombiesRemaining = 0;
     } else {
-      spawnLevelZombiesForZone(level.zombieCount, currentZone);
+      const nonBossCount = Math.max(3, 5 + Math.floor(actualIndex * 1.2));
+      spawnLevelZombiesForZone(nonBossCount, currentZone);
       spawnEnemyTanksForZone(currentZone);
     }
     hazards = level.hazards || [];

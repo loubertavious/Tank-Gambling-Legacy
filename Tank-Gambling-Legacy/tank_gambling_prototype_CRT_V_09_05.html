@@ -2343,181 +2343,141 @@
     });
 
     const panel = document.createElement('div');
-    Object.assign(panel.style, {
-      background:'#000', border:'2px solid #ffffff', padding:'20px', minWidth:'500px'
-    });
-
-    const h = document.createElement('div');
-    h.textContent = title;
-    Object.assign(h.style, { 
-      fontSize:'16px', 
-      marginBottom:'20px', 
-      textAlign:'center', 
-      color:'#ffffff',
-      fontFamily: 'Press Start 2P, monospace',
-      fontWeight: 'bold'
-    });
+    Object.assign(panel.style, { background:'#000', border:'3px solid #ffffff', padding:'20px', minWidth:'780px', maxWidth:'1060px' });
+    const playerColor = player.control === 'P1' ? '#ff69b4' : '#0080ff';
+    const h = document.createElement('div'); h.textContent = title || 'SPIN FOR AN UPGRADE';
+    Object.assign(h.style, { fontSize:'16px', marginBottom:'16px', textAlign:'center', color:'#ffff00', fontFamily:'Press Start 2P, monospace', fontWeight:'bold' });
     panel.appendChild(h);
 
-    const row = document.createElement('div');
-    Object.assign(row.style, { display:'flex', gap:'16px', justifyContent:'center' });
-    panel.appendChild(row);
+    const reelsRow = document.createElement('div');
+    Object.assign(reelsRow.style, { display:'flex', gap:'10px', justifyContent:'center', alignItems:'center', marginBottom:'12px' });
+    // Create CSS keyframes for subtle spin blur once per session
+    if(!document.getElementById('slotSpinStyles')){
+      const st = document.createElement('style'); st.id='slotSpinStyles'; st.textContent = `@keyframes spinBlur{0%{filter:blur(0)}50%{filter:blur(2px)}100%{filter:blur(0)}}`; document.head.appendChild(st);
+    }
+    const makeReel = ()=>{
+      const r = document.createElement('div');
+      Object.assign(r.style,{width:'180px',height:'110px',border:'2px solid #ffffff',background:'#000',overflow:'hidden',position:'relative'});
+      const strip = document.createElement('div');
+      Object.assign(strip.style,{position:'absolute',left:'0',right:'0',top:'0',willChange:'transform'});
+      r.appendChild(strip);
+      r._strip = strip; r._cells = []; r._value=null; r._pos=0; return r;
+    };
+    const reels=[makeReel(),makeReel(),makeReel(),makeReel(),makeReel()];
+    reels.forEach(r=>reelsRow.appendChild(r)); panel.appendChild(reelsRow);
 
-    const picks = uniquePicks(upgradePool, 3);
-    let selectedIndex = 0;
-    
-    // Get player color for highlighting
-    const playerColor = player.control === 'P1' ? '#ff69b4' : '#0080ff';
-    
-    const buttons = [];
-    for(let i = 0; i < picks.length; i++){
-      const up = picks[i];
-      
-      // Set text glow colors based on rarity (only for perk names)
-      let nameGlow = 'text-shadow: 0 0 4px #ffffff;'; // Default white glow for common
-      
-      if(up.rarity === 'rare') {
-        nameGlow = 'text-shadow: 0 0 8px #00aaff, 0 0 12px #00aaff;';
-      } else if(up.rarity === 'legendary') {
-        nameGlow = 'text-shadow: 0 0 10px #ffdd00, 0 0 15px #ffdd00, 0 0 20px #ffdd00;';
-      } else if(up.rarity === 'mythical') {
-        nameGlow = 'text-shadow: 0 0 12px #ffff00, 0 0 18px #ffff00, 0 0 24px #ffff00, 0 0 30px #ffff00;';
+    const controls=document.createElement('div'); Object.assign(controls.style,{display:'flex',gap:'12px',justifyContent:'center',alignItems:'center'});
+    const spinBtn=document.createElement('button'); spinBtn.textContent='SPIN'; Object.assign(spinBtn.style,{border:`3px solid ${playerColor}`,background:'#000',color:'#fff',padding:'10px 18px',cursor:'pointer',font:'14px "Press Start 2P"'});
+    const takeBtn=document.createElement('button'); takeBtn.textContent='TAKE'; Object.assign(takeBtn.style,{border:'3px solid #888',background:'#111',color:'#888',padding:'10px 18px',cursor:'not-allowed',font:'14px "Press Start 2P"'}); takeBtn.disabled=true;
+    const mythBtn=document.createElement('button'); mythBtn.textContent='MYTHICAL!'; Object.assign(mythBtn.style,{border:'3px solid #888',background:'#111',color:'#888',padding:'10px 18px',cursor:'not-allowed',font:'14px "Press Start 2P"'}); mythBtn.disabled=true;
+    controls.appendChild(spinBtn); controls.appendChild(takeBtn); controls.appendChild(mythBtn); panel.appendChild(controls);
+
+    const info = document.createElement('div');
+    Object.assign(info.style,{marginTop:'10px',padding:'10px',minHeight:'64px',border:'2px solid #333',color:'#fff',font:'12px "Press Start 2P"'});
+    info.textContent = 'Press SPIN';
+    panel.appendChild(info);
+
+    wrapper.appendChild(panel); document.body.appendChild(wrapper);
+
+    const rollRarity=()=>{ const r=Math.random(); if(r<0.02) return 'mythical'; if(r<0.10) return 'legendary'; if(r<0.35) return 'rare'; return 'common'; };
+    const pickByRarity=(rar)=>{ const pool=upgradePool.filter(u=>u.rarity===rar); return pool.length?choice(pool):choice(upgradePool); };
+    const fmt=(up)=>`<div style="font-weight:bold;margin-bottom:4px;font-size:12px;font-family:'Press Start 2P',monospace;color:${up.color||'#fff'}">${up.name}</div><div style="font-size:10px;color:#00ff88;font-family:'Press Start 2P',monospace;">${up.good}</div><div style="font-size:10px;color:#ff4444;font-family:'Press Start 2P',monospace;">${up.bad}</div>`;
+    const enableTake=(en)=>{ takeBtn.disabled=!en; takeBtn.style.border=en?`3px solid ${playerColor}`:'3px solid #888'; takeBtn.style.color=en?'#fff':'#888'; takeBtn.style.background=en?'#000':'#111'; takeBtn.style.cursor=en?'pointer':'not-allowed'; };
+    const enableMyth=(en)=>{ mythBtn.disabled=!en; mythBtn.style.border=en?'3px solid #ffff00':'3px solid #888'; mythBtn.style.color=en?'#ffff00':'#888'; mythBtn.style.background=en?'#000':'#111'; mythBtn.style.cursor=en?'pointer':'not-allowed'; };
+    let spinning=false; let finalPicks=[];
+    spinBtn.onclick=async()=>{
+      if(spinning) return; spinning=true; enableTake(false); enableMyth(false); finalPicks=[]; SFX.play('menuSelect');
+      // Build rolling strips for each reel
+      const cellH = 34; const visibleRows = 3; // fit name-only rows
+      for(const r of reels){
+        r._strip.innerHTML=''; r._cells=[]; r._pos=0;
+        const totalCells = 18; // enough to loop
+        for(let j=0;j<totalCells;j++){
+          const rar=rollRarity(); const up=pickByRarity(rar);
+          const cell=document.createElement('div');
+          Object.assign(cell.style,{height:cellH+'px',display:'flex',alignItems:'center',justifyContent:'center'});
+          cell.innerHTML = `<div style="font-weight:bold;font-size:12px;font-family:'Press Start 2P',monospace;color:${up.color||'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92%;">${up.name}</div>`;
+          cell._perk = up; r._strip.appendChild(cell); r._cells.push(cell);
+        }
+        r._strip.style.transform = 'translateY(0px)';
       }
-      
-      const btn = document.createElement('button');
-      btn.innerHTML = `<div style="font-weight:bold;margin-bottom:8px;font-size:12px;font-family:'Press Start 2P',monospace;${nameGlow}">${up.name}</div>
-                       <div style="font-size:10px;color:#00ff88;font-family:'Press Start 2P',monospace;">${up.good}</div>
-                       <div style="font-size:10px;color:#ff4444;font-family:'Press Start 2P',monospace;">${up.bad}</div>`;
-      Object.assign(btn.style, {
-        width:'140px', padding:'12px', cursor:'pointer',
-        background:'#000', color:'#ffffff', border:'2px solid #ffffff', textAlign:'left',
-        fontFamily: 'Press Start 2P, monospace'
+      // Spin all reels together
+      const t0 = performance.now(); const spinDur = 1400; const easeOut = t=>1-Math.pow(1-t,3);
+      await new Promise(res=>{
+        function step(){
+          const t = Math.min(1,(performance.now()-t0)/spinDur); const e=easeOut(t);
+          reels.forEach((r,idx)=>{
+            const baseSpeed = 12 + idx*2; // slight variance
+            r._pos = (r._pos + baseSpeed*(1-e));
+            // wrap
+            if(r._pos > r._cells.length*1){ r._pos = r._pos % r._cells.length; }
+            const y = -((r._pos % r._cells.length)*cellH);
+            r._strip.style.transform = `translateY(${y}px)`;
+          });
+          if(t<1) requestAnimationFrame(step); else res();
+        }
+        requestAnimationFrame(step);
       });
-      
-      if(i === selectedIndex) {
-        btn.style.border = `3px solid ${playerColor}`;
-      }
-      
-      // Add legendary animation
-      if(up.rarity === 'legendary') {
-        btn.style.animation = 'legendaryGlow 2s ease-in-out infinite alternate';
-      }
-      
-      // Add mythical animation
-      if(up.rarity === 'mythical') {
-        btn.style.animation = 'mythicalGlow 1.5s ease-in-out infinite alternate';
-      }
-      
-      btn.onclick = () => {
-        // Play menu select sound
-        SFX.play('menuSelect');
-        applyUpgrade(player, up);
-        document.body.removeChild(wrapper);
-        onDone && onDone();
-      };
-      
-      row.appendChild(btn);
-      buttons.push(btn);
+      // Snap each reel to a final cell and show full perk details
+      reels.forEach((r,idx)=>{
+        const stopIndex = (Math.floor(r._pos)+idx*2) % r._cells.length;
+        const cell = r._cells[stopIndex]; const up = cell?cell._perk:pickByRarity(rollRarity());
+        r._strip.innerHTML = `<div style="height:100%;display:flex;align-items:center;justify-content:center"><div style=\"font-weight:bold;font-size:12px;font-family:'Press Start 2P',monospace;color:${up.color||'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92%;\">${up.name}</div></div>`;
+        r._strip.style.transform = 'translateY(0)';
+        r._value = up; finalPicks[idx]=up;
+      });
+      const counts={}; for(const up of finalPicks){ counts[up.name]=(counts[up.name]||0)+1; }
+      let jackpot=false; Object.values(counts).forEach(c=>{ if(c>=3) jackpot=true; });
+      if(jackpot){ enableTake(true); enableMyth(true); } else { enableTake(true); enableMyth(false); }
+      // Update info to currently selected reel
+      updateHighlight(); updateInfo();
+      spinning=false;
+    };
+    // selection state
+    let selectedReel = 0;
+    function updateHighlight(){
+      reels.forEach((r,i)=>{ r.style.border = (i===selectedReel)?`3px solid ${playerColor}`:'2px solid #ffffff'; });
     }
-    
-    const instructions = document.createElement('div');
-    instructions.textContent = 'Use WASD/ARROWS to navigate, F// to select';
-    Object.assign(instructions.style, { 
-      textAlign:'center', 
-      marginTop:'16px', 
-      fontSize:'12px', 
-      color:'#ffffff',
-      fontFamily: 'Press Start 2P, monospace'
+    function updateInfo(){
+      const up = finalPicks[selectedReel];
+      if(up){ info.innerHTML = fmt(up); } else { info.textContent = 'Press SPIN'; }
+    }
+    reels.forEach((reel,idx)=>{
+      reel.onmouseenter=()=>{ selectedReel = idx; updateHighlight(); updateInfo(); };
+      reel.onclick=()=>{ if(takeBtn.disabled) return; const up=reel._value||finalPicks[idx]; if(!up) return; SFX.play('menuSelect'); applyUpgrade(player,up); try{document.body.removeChild(wrapper);}catch(_e){} paused=prevPaused; onDone&&onDone(); };
     });
-    panel.appendChild(instructions);
-
-    wrapper.appendChild(panel);
-    document.body.appendChild(wrapper);
-    
-    // Keyboard controls (use non-fire keys: P1=E, P2=.)
-    let keyHandler;
-    if(player.control === 'P1') {
-      keyHandler = (e) => {
-        if(e.key === 'w' || e.key === 'W' || e.key === 'a' || e.key === 'A') {
-          buttons[selectedIndex].style.border = '2px solid #ffffff';
-          selectedIndex = (selectedIndex - 1 + picks.length) % picks.length;
-          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
-        } else if(e.key === 's' || e.key === 'S' || e.key === 'd' || e.key === 'D') {
-          buttons[selectedIndex].style.border = '2px solid #ffffff';
-          selectedIndex = (selectedIndex + 1) % picks.length;
-          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
-        } else if(e.key === 'e' || e.key === 'E') {
-          // Play menu select sound
-          SFX.play('menuSelect');
-          const selectedUpgrade = picks[selectedIndex];
-          applyUpgrade(player, selectedUpgrade);
-          document.body.removeChild(wrapper);
-          window.removeEventListener('keydown', keyHandler);
-          onDone && onDone();
-        }
-      };
-    } else {
-      keyHandler = (e) => {
-        if(e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-          buttons[selectedIndex].style.border = '2px solid #ffffff';
-          selectedIndex = (selectedIndex - 1 + picks.length) % picks.length;
-          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
-        } else if(e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-          buttons[selectedIndex].style.border = '2px solid #ffffff';
-          selectedIndex = (selectedIndex + 1) % picks.length;
-          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
-        } else if(e.key === '.' || e.key === '>') {
-          // Play menu select sound
-          SFX.play('menuSelect');
-          const selectedUpgrade = picks[selectedIndex];
-          applyUpgrade(player, selectedUpgrade);
-          document.body.removeChild(wrapper);
-          window.removeEventListener('keydown', keyHandler);
-          onDone && onDone();
-        }
+    takeBtn.onclick=()=>{ if(takeBtn.disabled) return; const up = finalPicks[selectedReel]; if(!up) return; SFX.play('menuSelect'); applyUpgrade(player,up); try{document.body.removeChild(wrapper);}catch(_e){} paused=prevPaused; onDone&&onDone(); };
+    mythBtn.onclick=()=>{ if(mythBtn.disabled) return; const myth=upgradePool.filter(u=>u.rarity==='mythical'); const prize= myth.length?choice(myth):pickByRarity('legendary'); SFX.play('menuSelect'); applyUpgrade(player,prize); try{document.body.removeChild(wrapper);}catch(_e){} paused=prevPaused; onDone&&onDone(); };
+    // Keyboard controls for reel selection (P1: A/D/E, P2: arrows/.)
+    function makeKeyHandler(confirmKey1, confirmKey2, leftKeys, rightKeys){
+      return (e)=>{
+        const k = e.key;
+        if(leftKeys.includes(k)){ selectedReel = (selectedReel + reels.length - 1) % reels.length; updateHighlight(); updateInfo(); }
+        else if(rightKeys.includes(k)){ selectedReel = (selectedReel + 1) % reels.length; updateHighlight(); updateInfo(); }
+        else if(k === confirmKey1 || k === confirmKey2){ if(takeBtn.disabled) return; const up=finalPicks[selectedReel]; if(!up) return; SFX.play('menuSelect'); applyUpgrade(player,up); try{document.body.removeChild(wrapper);}catch(_e){} paused=prevPaused; onDone&&onDone(); }
       };
     }
-    
+    const keyHandler = (player.control === 'P1')
+      ? makeKeyHandler('e','E',['a','A'],['d','D'])
+      : makeKeyHandler('.','>',['ArrowLeft'],['ArrowRight']);
     window.addEventListener('keydown', keyHandler);
 
-    // Controller navigation for draft (D-pad/left-stick to move, X(2) to select)
+    // Controller navigation for reel selection
     const playerKey = (player===p1) ? 'p1' : 'p2';
-    let gpActive = true;
-    let prev = { left:false, right:false, up:false, down:false, select:false, axisX:0 };
+    let gpActive = true; let prev = { left:false, right:false, select:false, axisX:0 };
     function pollDraftGp(){
-      if(!gpActive) return;
-      pollGamepads();
-      const idx = gpIndex[playerKey];
-      const gp = idx!=null ? gamepads[idx] : null;
+      if(!gpActive) return; pollGamepads(); const idx = gpIndex[playerKey]; const gp = idx!=null ? gamepads[idx] : null;
       if(gp){
         const left = !!(gp.buttons[14] && gp.buttons[14].pressed);
         const right = !!(gp.buttons[15] && gp.buttons[15].pressed);
-        const up = !!(gp.buttons[12] && gp.buttons[12].pressed);
-        const down = !!(gp.buttons[13] && gp.buttons[13].pressed);
         const ax = applyDeadzone(gp.axes[0] || 0);
-        const select = !!(gp.buttons[2] && gp.buttons[2].pressed); // X on Xbox, Square on PS
-        const leftEdge = (!prev.left && left) || (prev.axisX >= 0.5 && ax <= -0.5) || (!prev.up && up);
-        const rightEdge = (!prev.right && right) || (prev.axisX <= -0.5 && ax >= 0.5) || (!prev.down && down);
-        if(leftEdge){
-          buttons[selectedIndex].style.border = '2px solid #ffffff';
-          selectedIndex = (selectedIndex - 1 + picks.length) % picks.length;
-          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
-        } else if(rightEdge){
-          buttons[selectedIndex].style.border = '2px solid #ffffff';
-          selectedIndex = (selectedIndex + 1) % picks.length;
-          buttons[selectedIndex].style.border = `3px solid ${playerColor}`;
-        }
-        if(!prev.select && select){
-          SFX.play('menuSelect');
-          const selectedUpgrade = picks[selectedIndex];
-          applyUpgrade(player, selectedUpgrade);
-          gpActive = false;
-          try { window.removeEventListener('keydown', keyHandler); } catch(_e){}
-          try { document.body.removeChild(wrapper); } catch(_e){}
-          onDone && onDone();
-          return;
-        }
-        prev = { left, right, up, down, select, axisX: ax };
+        const select = !!(gp.buttons[2] && gp.buttons[2].pressed);
+        const leftEdge = (!prev.left && left) || (prev.axisX >= 0.5 && ax <= -0.5);
+        const rightEdge = (!prev.right && right) || (prev.axisX <= -0.5 && ax >= 0.5);
+        if(leftEdge){ selectedReel=(selectedReel+reels.length-1)%reels.length; updateHighlight(); updateInfo(); }
+        else if(rightEdge){ selectedReel=(selectedReel+1)%reels.length; updateHighlight(); updateInfo(); }
+        if(!prev.select && select && !takeBtn.disabled){ const up=finalPicks[selectedReel]; if(up){ SFX.play('menuSelect'); applyUpgrade(player,up); try{document.body.removeChild(wrapper);}catch(_e){} paused=prevPaused; onDone&&onDone(); return; } }
+        prev = { left, right, select, axisX: ax };
       }
       requestAnimationFrame(pollDraftGp);
     }

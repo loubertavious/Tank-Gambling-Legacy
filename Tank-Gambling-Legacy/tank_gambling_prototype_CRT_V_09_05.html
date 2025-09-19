@@ -760,6 +760,7 @@
   let boss = null; // active boss entity when present
   let bossActive = false; // true on boss waves while boss alive
   let currentZone = 0; // 0-based zone index
+  let runZoneOrders = null; // per-run shuffled order for non-boss sub-levels
   
   // Sidescroller level system
   let currentLevel = 0;
@@ -974,6 +975,28 @@
       };
     }
   }
+
+  // ---- Per-run level order randomization (zones 1–2 non-boss levels) ----
+  function shuffleArray(arr){
+    for(let i=arr.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); const t = arr[i]; arr[i]=arr[j]; arr[j]=t; }
+    return arr;
+  }
+  function initRunOrder(){
+    runZoneOrders = {};
+    // For zone 0 and 1, shuffle sub-level offsets [0,1,2]
+    runZoneOrders[0] = shuffleArray([0,1,2]);
+    runZoneOrders[1] = shuffleArray([0,1,2]);
+  }
+  function mapLevelIndex(levelIndex){
+    const zone = getZoneIndex(levelIndex);
+    if(isBossLevel(levelIndex)) return levelIndex;
+    const offset = levelIndex % 4; // 0..2 within zone
+    if(runZoneOrders && runZoneOrders[zone]){
+      const mappedOffset = runZoneOrders[zone][offset] || offset;
+      return zone * 4 + mappedOffset;
+    }
+    return levelIndex;
+  }
   
   // Create exit door
   function createExitDoor() {
@@ -1003,12 +1026,13 @@
   
   // Load a specific level
   function loadLevel(levelIndex) {
-    // Ensure this level exists (procedural beyond authored data)
-    ensureLevel(levelIndex);
+    // Map logical level to actual level index using per-run order
+    const actualIndex = mapLevelIndex(levelIndex);
+    ensureLevel(actualIndex);
     currentLevel = levelIndex;
-    currentZone = getZoneIndex(currentLevel);
+    currentZone = getZoneIndex(actualIndex);
     levelComplete = false;
-    const level = levelData[levelIndex];
+    const level = levelData[actualIndex];
     
     // Set walls for this level
     walls = [...level.walls];
@@ -1026,7 +1050,7 @@
     bossActive = false;
     
     // Spawn zombies or boss (force boss scheduling every 4th level)
-    const bossHere = isBossLevel(levelIndex) || level.isBoss;
+    const bossHere = isBossLevel(actualIndex) || level.isBoss;
     if (bossHere) {
       boss = makeBossForZone(currentZone);
       bossActive = true;
@@ -1057,6 +1081,10 @@
       let x = arenaPadding + innerW - 80 - (i * 40);
       let y = arenaPadding + 50 + Math.random() * (innerH - 100);
       const z = makeZombie(x,y);
+      // Variant selection by zone
+      if(zoneIdx === 0){ z.variant = 'shambler'; }
+      if(zoneIdx >= 2){ z.variant = 'runner'; }
+      if(zoneIdx === 6){ z.variant = 'shadow'; }
       if(zoneIdx >= 2){ // Zone 3+: faster zombies
         z.thrust += 25 + zoneIdx * 5;
       }
@@ -1091,7 +1119,7 @@
     
     nextLevelIndex = nextLevel;
     // Pre-generate next level so overlay can display its name
-    ensureLevel(nextLevelIndex);
+    ensureLevel(mapLevelIndex(nextLevelIndex));
     transitionState = 'fade_out';
     transitionTimer = 0;
     SFX.play('roundWin');
@@ -1783,7 +1811,8 @@
       touchDamage: 0.5, touchCooldown: 0.8, touchTimer: 0,
       _dead: false,
       dirX: 1, dirY: 0, // start moving right by default
-      decideCooldown: 0
+      decideCooldown: 0,
+      variant: 'shambler'
     };
   }
 
@@ -1810,6 +1839,8 @@
   function startZombies(){
     // Initialize level data
     initLevelData();
+    // Init randomized order per run
+    initRunOrder();
     
     // Reset players
     for(const t of players){ resetPlayer(t); }
@@ -3061,10 +3092,24 @@
         ctx.save();
         ctx.translate(z.x, z.y);
         ctx.rotate(z.a || 0);
-        ctx.shadowColor = '#7CFC00';
+        let zColor = '#7CFC00';
+        if(z.variant === 'runner') zColor = '#ff4444';
+        if(z.variant === 'shadow') zColor = '#666699';
+        ctx.shadowColor = zColor;
         ctx.shadowBlur = 6;
-        ctx.fillStyle = '#7CFC00';
+        ctx.fillStyle = zColor;
         ctx.fillRect(-z.size/2, -z.size/2, z.size, z.size);
+        // Variant stripes/dots
+        if(z.variant === 'runner'){
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(-z.size/2, -2, z.size, 4);
+        }
+        if(z.variant === 'shadow'){
+          ctx.fillStyle = '#000000';
+          ctx.globalAlpha = 0.25;
+          ctx.fillRect(-z.size/2, -z.size/2, z.size, z.size);
+          ctx.globalAlpha = 1;
+        }
         ctx.shadowBlur = 0;
         ctx.restore();
         // Zombie health bar
@@ -3088,6 +3133,16 @@
         ctx.shadowBlur = 8;
         ctx.fillStyle = e.color;
         ctx.fillRect(-e.size/2, -e.size/2, e.size, e.size);
+        // Visual distinction
+        if(e.variant==='light'){
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(-e.size/2, -3, e.size, 6);
+        } else if(e.variant==='heavy'){
+          ctx.fillStyle = '#000000';
+          ctx.globalAlpha = 0.2;
+          ctx.fillRect(-e.size/2, -e.size/2, e.size, e.size);
+          ctx.globalAlpha = 1;
+        }
         ctx.shadowBlur = 0;
         // Barrel
         ctx.fillStyle = '#ddd';

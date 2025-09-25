@@ -1374,13 +1374,13 @@
   function makeTank(x,y,color,control){
     return {
       x,y, size:32, a:-Math.PI/2,
-      thrust: 180, rotSpeed: 2.6,
+      thrust: 180, baseThrust: 180, rotSpeed: 2.6,
       fireCd: 0.8, fireTimer: 0,
       bulletSpeed: 380, maxBounces: 0, pierce:0, multishot:1, spread: 15, recoil: 0,
       damage: 1, // Add missing damage property
       alive:true, color, control, score:0,
       hp:3, maxHp:3, showHpTimer:0,
-      perks:[],
+      perks:[], allowSlow: false,
       moveSfxTimer: 0, turnSfxTimer: 0
     };
   }
@@ -1416,81 +1416,81 @@
     // COMMON PERKS (White - Basic effects)
     {
       name:'Rapid Fire',
-      good:'+25% fire rate',
-      bad:'-15% bullet speed',
-      apply:p=>{ p.fireCd*=0.75; p.bulletSpeed*=0.85; },
+      good:'+20% fire rate',
+      bad:'-10% bullet speed',
+      apply:p=>{ p.fireCd*=0.8; p.bulletSpeed*=0.9; },
       color: '#ffffff',
       rarity: 'common'
     },
     {
       name:'Heavy Rounds',
-      good:'+2 bullet damage',
-      bad:'-20% fire rate',
-      apply:p=>{ p.damage+=2; p.fireCd*=1.2; },
+      good:'+1.5 bullet damage',
+      bad:'-15% fire rate',
+      apply:p=>{ p.damage+=1.5; p.fireCd*=1.15; },
       color: '#ff4444',
       rarity: 'common'
     },
     {
       name:'Speed Loader',
-      good:'+40% fire rate',
+      good:'+30% fire rate',
       bad:'-1 bullet damage',
-      apply:p=>{ p.fireCd*=0.6; p.damage=Math.max(1,p.damage-1); },
+      apply:p=>{ p.fireCd*=0.7; p.damage=Math.max(1,p.damage-1); },
       color: '#ffffff',
       rarity: 'common'
     },
     {
       name:'Ricochet',
       good:'+2 ricochet bounces',
-      bad:'-25% bullet speed',
-      apply:p=>{ p.maxBounces+=2; p.bulletSpeed*=0.75; },
+      bad:'-20% bullet speed',
+      apply:p=>{ p.maxBounces+=2; p.bulletSpeed*=0.8; },
       color: '#ffff00',
       rarity: 'common'
     },
     {
       name:'Multishot',
-      good:'+2 bullets per shot (stacks)',
-      bad:'-15% bullet speed',
-      apply:p=>{ p.multishot+=2; p.bulletSpeed*=0.85; },
+      good:'+1 bullet per shot (stacks)',
+      bad:'-10% bullet speed',
+      apply:p=>{ p.multishot+=1; p.bulletSpeed*=0.9; },
       color: '#ff00ff',
       rarity: 'common'
     },
     {
       name:'Piercing',
       good:'+1 wall/target pierce',
-      bad:'-15% move speed',
-      apply:p=>{ p.pierce+=1; p.thrust*=0.85; },
+      bad:'-10% move speed',
+      apply:p=>{ p.pierce+=1; p.thrust*=0.9; },
       color: '#ff8800',
       rarity: 'common'
     },
     {
       name:'Energy Drink',
-      good:'+18% move speed',
+      good:'+15% move speed',
       bad:'-10% turn speed',
-      apply:p=>{ p.thrust*=1.18; p.rotSpeed*=0.9; },
+      apply:p=>{ p.thrust*=1.15; p.rotSpeed*=0.9; },
       color: '#00ff41',
       rarity: 'common'
     },
     {
       name:'Trick Shot',
-      good:'+20% bullet speed',
+      good:'+15% bullet speed',
       bad:'-1 ricochet cap',
-      apply:p=>{ p.bulletSpeed*=1.2; p.maxBounces=Math.max(0,p.maxBounces-1); },
+      apply:p=>{ p.bulletSpeed*=1.15; p.maxBounces=Math.max(0,p.maxBounces-1); },
       color: '#ffffff',
       rarity: 'common'
     },
     {
       name:'Beyblade',
-      good:'+30% turn speed',
-      bad:'-10% move speed',
-      apply:p=>{ p.rotSpeed*=1.3; p.thrust*=0.9; },
+      good:'+25% turn speed',
+      bad:'-8% move speed',
+      apply:p=>{ p.rotSpeed*=1.25; p.thrust*=0.92; },
       color: '#00ff41',
       rarity: 'common'
     },
     {
       name:'Extra Health',
       good:'+2 max health & heal',
-      bad:'Reload +10%',
-      apply:p=>{ p.maxHp+=2; p.hp=p.maxHp; p.fireCd*=1.1; },
+      bad:'Reload +15%',
+      apply:p=>{ p.maxHp+=2; p.hp=p.maxHp; p.fireCd*=1.15; },
       color: '#00ff41',
       rarity: 'common'
     },
@@ -1498,65 +1498,65 @@
     // RARE PERKS (Blue - Enhanced effects)
     {
       name:'Spray & Pray',
-      good:'+60% fire rate',
-      bad:'-25% bullet speed, -1 damage',
-      apply:p=>{ p.fireCd*=0.4; p.bulletSpeed*=0.75; p.damage=Math.max(1,p.damage-1); },
+      good:'+45% fire rate',
+      bad:'-20% bullet speed, -1 damage',
+      apply:p=>{ p.fireCd*=0.55; p.bulletSpeed*=0.8; p.damage=Math.max(1,p.damage-1); },
       color: '#00aaff',
       rarity: 'rare'
     },
     {
       name:'Big Boi Bullets',
-      good:'+4 bullet damage',
-      bad:'-30% fire rate, -15% move speed',
-      apply:p=>{ p.damage+=4; p.fireCd*=1.3; p.thrust*=0.85; },
+      good:'+3 bullet damage',
+      bad:'-25% fire rate, -10% move speed',
+      apply:p=>{ p.damage+=3; p.fireCd*=1.25; p.thrust*=0.9; },
       color: '#ff0066',
       rarity: 'rare'
     },
     {
       name:'Bouncy Castle',
       good:'+4 ricochet bounces',
-      bad:'-35% bullet speed, -20% move speed',
-      apply:p=>{ p.maxBounces+=4; p.bulletSpeed*=0.65; p.thrust*=0.8; },
+      bad:'-30% bullet speed, -15% move speed',
+      apply:p=>{ p.maxBounces+=4; p.bulletSpeed*=0.7; p.thrust*=0.85; },
       color: '#ffff66',
       rarity: 'rare'
     },
     {
       name:'Too Many Bullets',
-      good:'+3 bullets per shot (stacks)',
-      bad:'-25% bullet speed, -20% fire rate',
-      apply:p=>{ p.multishot+=3; p.bulletSpeed*=0.75; p.fireCd*=1.2; },
+      good:'+2 bullets per shot (stacks)',
+      bad:'-25% bullet speed, -15% fire rate',
+      apply:p=>{ p.multishot+=2; p.bulletSpeed*=0.75; p.fireCd*=1.15; },
       color: '#ff66ff',
       rarity: 'rare'
     },
     {
       name:'Wall Hacker',
       good:'+2 wall/target pierce',
-      bad:'-25% move speed, -15% turn speed',
-      apply:p=>{ p.pierce+=2; p.thrust*=0.75; p.rotSpeed*=0.85; },
+      bad:'-20% move speed, -10% turn speed',
+      apply:p=>{ p.pierce+=2; p.thrust*=0.8; p.rotSpeed*=0.9; },
       color: '#ffaa44',
       rarity: 'rare'
     },
     {
       name:'Zoomies',
-      good:'+35% move speed, +25% turn speed',
-      bad:'-20% fire rate, -1 damage',
-      apply:p=>{ p.thrust*=1.35; p.rotSpeed*=1.25; p.fireCd*=1.2; p.damage=Math.max(1,p.damage-1); },
+      good:'+30% move speed, +25% turn speed',
+      bad:'-15% fire rate, -1 damage',
+      apply:p=>{ p.thrust*=1.3; p.rotSpeed*=1.25; p.fireCd*=1.15; p.damage=Math.max(1,p.damage-1); },
       color: '#44ff88',
       rarity: 'rare'
     },
     {
       name:'Speed Demon',
-      good:'+40% bullet speed, +25% fire rate',
+      good:'+30% bullet speed, +20% fire rate',
       bad:'-2 ricochet cap, -15% move speed',
-      apply:p=>{ p.bulletSpeed*=1.4; p.fireCd*=0.75; p.maxBounces=Math.max(0,p.maxBounces-2); p.thrust*=0.85; },
+      apply:p=>{ p.bulletSpeed*=1.3; p.fireCd*=0.83; p.maxBounces=Math.max(0,p.maxBounces-2); p.thrust*=0.85; },
       color: '#ffffff',
       rarity: 'rare'
     },
     {
       name:'Chonky Tank',
-      good:'+4 max health & heal, +15% move speed',
+      good:'+3 max health & heal, +10% move speed',
       bad:'-25% fire rate, -20% turn speed',
-      apply:p=>{ p.maxHp+=4; p.hp=p.maxHp; p.thrust*=1.15; p.fireCd*=1.25; p.rotSpeed*=0.8; },
+      apply:p=>{ p.maxHp+=3; p.hp=p.maxHp; p.thrust*=1.10; p.fireCd*=1.25; p.rotSpeed*=0.8; },
       color: '#44ff88',
       rarity: 'rare'
     },
@@ -1564,49 +1564,49 @@
     // LEGENDARY PERKS (Gold - Extreme effects)
     {
       name:'Bullet Hell',
-      good:'+70% fire rate, +2 bullets per shot (stacks)',
-      bad:'-35% bullet speed, -1 damage, -20% move speed',
-      apply:p=>{ p.fireCd*=0.59; p.multishot+=2; p.bulletSpeed*=0.65; p.damage=Math.max(1,p.damage-1); p.thrust*=0.8; },
+      good:'+55% fire rate, +2 bullets per shot (stacks)',
+      bad:'-30% bullet speed, -1 damage, -15% move speed',
+      apply:p=>{ p.fireCd*=0.65; p.multishot+=2; p.bulletSpeed*=0.7; p.damage=Math.max(1,p.damage-1); p.thrust*=0.85; },
       color: '#ffdd00',
       rarity: 'legendary'
     },
     {
       name:'Delete Button',
-      good:'+6 bullet damage, +2 pierce',
-      bad:'-35% fire rate, -25% move speed, -15% turn speed',
-      apply:p=>{ p.damage+=6; p.pierce+=2; p.fireCd*=1.35; p.thrust*=0.75; p.rotSpeed*=0.85; },
+      good:'+5 bullet damage, +2 pierce',
+      bad:'-40% fire rate, -15% move speed, -10% turn speed',
+      apply:p=>{ p.damage+=5; p.pierce+=2; p.fireCd*=1.4; p.thrust*=0.85; p.rotSpeed*=0.9; },
       color: '#ff4400',
       rarity: 'legendary'
     },
     {
       name:'Pinball Wizard',
-      good:'+6 ricochet bounces, +35% bullet speed',
-      bad:'-45% move speed, -30% turn speed, -1 damage',
-      apply:p=>{ p.maxBounces+=6; p.bulletSpeed*=1.35; p.thrust*=0.55; p.rotSpeed*=0.7; p.damage=Math.max(1,p.damage-1); },
+      good:'+6 ricochet bounces, +30% bullet speed',
+      bad:'-25% move speed, -20% turn speed, -1 damage',
+      apply:p=>{ p.maxBounces+=6; p.bulletSpeed*=1.3; p.thrust*=0.75; p.rotSpeed*=0.8; p.damage=Math.max(1,p.damage-1); },
       color: '#ffff00',
       rarity: 'legendary'
     },
     {
       name:'Bullet Tsunami',
-      good:'+4 bullets per shot (stacks), +30% bullet speed',
-      bad:'-30% fire rate, -40% move speed, -1 damage',
-      apply:p=>{ p.multishot+=4; p.bulletSpeed*=1.3; p.fireCd*=1.3; p.thrust*=0.6; p.damage=Math.max(1,p.damage-1); },
+      good:'+4 bullets per shot (stacks), +25% bullet speed',
+      bad:'-35% fire rate, -25% move speed, -1 damage',
+      apply:p=>{ p.multishot+=4; p.bulletSpeed*=1.25; p.fireCd*=1.35; p.thrust*=0.75; p.damage=Math.max(1,p.damage-1); },
       color: '#ff00ff',
       rarity: 'legendary'
     },
     {
       name:'Sonic Tank',
-      good:'+45% move speed, +40% turn speed, +5 max health',
-      bad:'-35% fire rate, -2 damage, -30% bullet speed',
-      apply:p=>{ p.thrust*=1.45; p.rotSpeed*=1.4; p.maxHp+=5; p.hp=p.maxHp; p.fireCd*=1.35; p.damage=Math.max(1,p.damage-2); p.bulletSpeed*=0.7; },
+      good:'+40% move speed, +35% turn speed, +3 max health',
+      bad:'-35% fire rate, -2 damage, -25% bullet speed',
+      apply:p=>{ p.thrust*=1.4; p.rotSpeed*=1.35; p.maxHp+=3; p.hp=p.maxHp; p.fireCd*=1.35; p.damage=Math.max(1,p.damage-2); p.bulletSpeed*=0.75; },
       color: '#00ffff',
       rarity: 'legendary'
     },
     {
       name:'Overkill',
-      good:'+10 bullet damage, +4 pierce, +70% bullet speed',
-      bad:'-55% fire rate, -50% move speed, -45% turn speed',
-      apply:p=>{ p.damage+=10; p.pierce+=4; p.bulletSpeed*=1.7; p.fireCd*=1.55; p.thrust*=0.5; p.rotSpeed*=0.55; },
+      good:'+8 bullet damage, +3 pierce, +60% bullet speed',
+      bad:'-60% fire rate, -30% move speed, -30% turn speed',
+      apply:p=>{ p.damage+=8; p.pierce+=3; p.bulletSpeed*=1.6; p.fireCd*=1.6; p.thrust*=0.7; p.rotSpeed*=0.7; },
       color: '#ff0000',
       rarity: 'legendary'
     },
@@ -1615,19 +1615,19 @@
     {
       name:'Piss Missile',
       good:'+1000% fire rate, bright yellow bullets, normal bullet speed',
-      bad:'-90% move speed, -80% turn speed, -95% max health',
-      apply:p=>{ p.fireCd*=0.1; p.thrust*=0.1; p.rotSpeed*=0.2; p.maxHp = Math.max(1, Math.floor(p.maxHp * 0.05)); p.hp = p.maxHp; p.hasPissMissiles = true; },
+      bad:'-70% move speed, -70% turn speed, -95% max health',
+      apply:p=>{ p.fireCd*=0.1; p.thrust*=0.3; p.rotSpeed*=0.3; p.maxHp = Math.max(1, Math.floor(p.maxHp * 0.05)); p.hp = p.maxHp; p.hasPissMissiles = true; p.allowSlow = true; },
       color: '#ffff00',
       rarity: 'mythical'
     }
   ];
 
-  // Extend upgrade pool with Landmines perk
+  // Extend upgrade pool with Landmines perk (rebalanced)
   upgradePool.push({
     name:'Landmines',
-    good:'Plants a mine every 3rd shot',
+    good:'Plants a mine every 4th shot',
     bad:'-10% move speed',
-    apply:p=>{ p.thrust*=0.9; p.hasLandmines = true; p.shotCounter = 0; },
+    apply:p=>{ p.thrust*=0.9; p.hasLandmines = true; p.shotCounter = 0; p.mineEvery = 4; },
     color:'#ffaa00',
     rarity: 'common'
   });
@@ -1643,6 +1643,9 @@
   }
 
   function updateControls(t, dt){
+    // Apply global movement floor to prevent crawl
+    const minFloor = t.allowSlow ? 0.3 : 0.7; // 30% floor for extreme perks only
+    const effectiveThrust = Math.max(t.thrust, (t.baseThrust||180) * minFloor);
     const playerKey = (t===p1) ? 'p1' : 'p2';
     const isController = controlConfig[playerKey].type === 'controller';
     if(!isController && t.control==='P1'){
@@ -1664,8 +1667,8 @@
         const dir = (up?1:0) + (down?-1:0);
         // Play reduced/rare movement sound
         if(dir !== 0 && (t.moveSfxTimer||0)<=0){ SFX.play('move'); t.moveSfxTimer = 0.35; }
-        const nx = t.x + Math.cos(t.a) * t.thrust * dir * dt;
-        const ny = t.y + Math.sin(t.a) * t.thrust * dir * dt;
+        const nx = t.x + Math.cos(t.a) * effectiveThrust * dir * dt;
+        const ny = t.y + Math.sin(t.a) * effectiveThrust * dir * dt;
         attemptMove(t, nx, ny);
         if(fire) tryFire(t);
     } else if(!isController) {
@@ -1687,8 +1690,8 @@
         const dir = (up?1:0) + (down?-1:0);
         // Play reduced/rare movement sound
         if(dir !== 0 && (t.moveSfxTimer||0)<=0){ SFX.play('move'); t.moveSfxTimer = 0.35; }
-        const nx = t.x + Math.cos(t.a) * t.thrust * dir * dt;
-        const ny = t.y + Math.sin(t.a) * t.thrust * dir * dt;
+        const nx = t.x + Math.cos(t.a) * effectiveThrust * dir * dt;
+        const ny = t.y + Math.sin(t.a) * effectiveThrust * dir * dt;
         attemptMove(t, nx, ny);
         if(fire) tryFire(t);
     } else {
@@ -1705,8 +1708,8 @@
         t.a += turnX * t.rotSpeed * dt;
         // Forward/back from left stick Y (up is negative)
         const dir = -ly;
-        const nx = t.x + Math.cos(t.a) * t.thrust * dir * dt;
-        const ny = t.y + Math.sin(t.a) * t.thrust * dir * dt;
+        const nx = t.x + Math.cos(t.a) * effectiveThrust * dir * dt;
+        const ny = t.y + Math.sin(t.a) * effectiveThrust * dir * dt;
         attemptMove(t, nx, ny);
         // Fire on RT (7) / LT (6) / A (0) / B (1)
         const firePressed = (gp.buttons[7] && gp.buttons[7].pressed) || (gp.buttons[6] && gp.buttons[6].pressed) || (gp.buttons[0] && gp.buttons[0].pressed) || (gp.buttons[1] && gp.buttons[1].pressed);
@@ -2239,10 +2242,11 @@
     }
     if(t.recoil>0){ t.x -= Math.cos(t.a)*t.recoil; t.y -= Math.sin(t.a)*t.recoil; }
 
-    // Landmines: every 3rd shot plants a mine under the tank
+    // Landmines: plant a mine every Nth shot (default 4)
     if(t.hasLandmines){
       t.shotCounter = (t.shotCounter||0) + 1;
-      if(t.shotCounter % 3 === 0){
+      const everyN = t.mineEvery || 4;
+      if(t.shotCounter % everyN === 0){
         const mine = {
           x: t.x,
           y: t.y,
@@ -2251,8 +2255,8 @@
           armTime: 0.25,
           armed: false,
           triggered: false,
-          damage: Math.max(2, t.damage + 1),
-          radius: 46
+          damage: Math.max(2, Math.floor(t.damage) + 1),
+          radius: 44
         };
         mines.push(mine);
       }
@@ -2291,12 +2295,12 @@
     const names = new Set(), picks = [];
     let guard = 100;
     
-    // Rarity weights: common (65%), rare (25%), legendary (8%), mythical (2%)
+    // Rarity weights: common (70%), rare (22%), legendary (7.5%), mythical (0.5%)
     const rarityWeights = {
-      'common': 0.65,
-      'rare': 0.25,
-      'legendary': 0.08,
-      'mythical': 0.02
+      'common': 0.70,
+      'rare': 0.22,
+      'legendary': 0.075,
+      'mythical': 0.005
     };
     
     while(picks.length < n && guard-- > 0){
@@ -2382,7 +2386,7 @@
 
     wrapper.appendChild(panel); document.body.appendChild(wrapper);
 
-    const rollRarity=()=>{ const r=Math.random(); if(r<0.02) return 'mythical'; if(r<0.10) return 'legendary'; if(r<0.35) return 'rare'; return 'common'; };
+    const rollRarity=()=>{ const r=Math.random(); if(r<0.005) return 'mythical'; if(r<0.085) return 'legendary'; if(r<0.335) return 'rare'; return 'common'; };
     const pickByRarity=(rar)=>{ const pool=upgradePool.filter(u=>u.rarity===rar); return pool.length?choice(pool):choice(upgradePool); };
     const rarityColor=(rar)=>{ switch(rar){ case 'rare': return '#00aaff'; case 'legendary': return '#ffdd00'; case 'mythical': return '#ffff00'; default: return '#ffffff'; } };
     const fmt=(up)=>`<div style="font-weight:bold;margin-bottom:4px;font-size:12px;font-family:'Press Start 2P',monospace;color:${rarityColor(up.rarity)}">${up.name}</div><div style="font-size:10px;color:#00ff88;font-family:'Press Start 2P',monospace;">${up.good}</div><div style="font-size:10px;color:#ff4444;font-family:'Press Start 2P',monospace;">${up.bad}</div>`;
@@ -2488,7 +2492,8 @@
         const left = !!(gp.buttons[14] && gp.buttons[14].pressed);
         const right = !!(gp.buttons[15] && gp.buttons[15].pressed);
         const ax = applyDeadzone(gp.axes[0] || 0);
-        const select = !!(gp.buttons[2] && gp.buttons[2].pressed);
+        const select = !!(((gp.buttons[0] && gp.buttons[0].pressed) || (gp.buttons[2] && gp.buttons[2].pressed)));
+        const myth = !!(gp.buttons[3] && gp.buttons[3].pressed);
         const leftEdge = (!prev.left && left) || (prev.axisX >= 0.5 && ax <= -0.5);
         const rightEdge = (!prev.right && right) || (prev.axisX <= -0.5 && ax >= 0.5);
         if(leftEdge){ selectedReel=(selectedReel+reels.length-1)%reels.length; updateHighlight(); updateInfo(); }
@@ -2499,7 +2504,10 @@
             const up=finalPicks[selectedReel]; if(up){ SFX.play('menuSelect'); applyUpgrade(player,up); try{document.body.removeChild(wrapper);}catch(_e){} paused=prevPaused; onDone&&onDone(); return; }
           }
         }
-        prev = { left, right, select, axisX: ax };
+        if(!prev.myth && myth){
+          if(!mythBtn.disabled){ mythBtn.onclick(); return; }
+        }
+        prev = { left, right, select, myth, axisX: ax };
       }
       requestAnimationFrame(pollDraftGp);
     }
@@ -3551,13 +3559,13 @@
   }
 
   function resetPlayer(p){
-    p.thrust = 180; p.rotSpeed = 2.6;
+    p.thrust = 180; p.baseThrust = 180; p.rotSpeed = 2.6;
     p.fireCd = 0.8; p.fireTimer = 0;
     p.bulletSpeed = 380; p.maxBounces = 0; p.pierce = 0;
     p.multishot = 1; p.spread = 15; p.recoil = 0;
     p.damage = 1;
     p.alive = true; p.hp = 3; p.maxHp = 3; p.showHpTimer = 0;
-    p.perks = [];
+    p.perks = []; p.allowSlow = false;
     p.moveSfxTimer = 0; p.turnSfxTimer = 0;
   }
 

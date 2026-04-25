@@ -2370,7 +2370,7 @@
       r.appendChild(strip);
       r._strip = strip; r._cells = []; r._value=null; r._pos=0; return r;
     };
-    const reels=[makeReel(),makeReel(),makeReel(),makeReel(),makeReel()];
+    const reels=[makeReel(),makeReel(),makeReel()];
     reels.forEach(r=>reelsRow.appendChild(r)); panel.appendChild(reelsRow);
 
     const controls=document.createElement('div'); Object.assign(controls.style,{display:'flex',gap:'12px',justifyContent:'center',alignItems:'center'});

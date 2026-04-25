@@ -713,8 +713,9 @@
     }
   }
   
-  window.addEventListener('keydown', e=>{ 
-    keys.add(e.key); 
+  const codes = new Set();
+  window.addEventListener('keydown', e=>{
+    keys.add(e.key); codes.add(e.code);
     SFX.ensure();
     startMusicOnInteraction(); // Start music on any key press
     
@@ -727,7 +728,8 @@
       console.log('Music', musicMuted ? 'muted' : 'unmuted');
     }
   });
-  window.addEventListener('keyup',   e=> { keys.delete(e.key); });
+  window.addEventListener('keyup', e=> { keys.delete(e.key); codes.delete(e.code); });
+  function keyPressed(k){ return keys.has(k) || codes.has(k) || (k.length===1 && keys.has(k.toUpperCase())) || (k.length===1 && keys.has(k.toLowerCase())); }
   
   // Also start music on common user interactions (desktop/mobile)
   ['click','pointerdown','touchstart'].forEach(ev=>{
@@ -746,6 +748,14 @@
   let state = 'start'; // start -> draft -> round
   let roundNumber = 1;
   let gameMode = 'versus'; // 'versus' | 'zombies'
+  let playerCount = 2;
+
+  const PLAYER_PRESETS = [
+    { color: '#ff69b4', control: 'P1', name: 'Player 1', kb: { up:'w',        down:'s',         left:'a',         right:'d',         fire:'f'       } },
+    { color: '#0080ff', control: 'P2', name: 'Player 2', kb: { up:'ArrowUp',  down:'ArrowDown',  left:'ArrowLeft', right:'ArrowRight', fire:'/'       } },
+    { color: '#00cc44', control: 'P3', name: 'Player 3', kb: { up:'i',        down:'k',          left:'j',         right:'l',         fire:'p'       } },
+    { color: '#ff8800', control: 'P4', name: 'Player 4', kb: { up:'Numpad8',  down:'Numpad2',    left:'Numpad4',   right:'Numpad6',   fire:'Numpad0' } },
+  ];
   let paused = false; // global pause (used for zombies perk drafts)
 
   // Maze setup
@@ -1156,8 +1166,7 @@
     }
     
     // Position players at the left side
-    p1.x = arenaPadding + 50; p1.y = arenaPadding + innerH * 0.33; p1.a = 0;
-    p2.x = arenaPadding + 50; p2.y = arenaPadding + innerH * 0.66; p2.a = 0;
+    players.forEach((t,i)=>{ t.x=arenaPadding+50; t.y=arenaPadding+innerH*(i+1)/(players.length+1); t.a=0; });
     
     // Clear zombies and bullets
     zombies = [];
@@ -1385,9 +1394,12 @@
     };
   }
 
-  const p1 = makeTank(W*0.25, H*0.5, '#ff69b4', 'P1');
-  const p2 = makeTank(W*0.75, H*0.5, '#0080ff', 'P2');
-  const players = [p1,p2];
+  const p1 = makeTank(W*0.25, H*0.5, PLAYER_PRESETS[0].color, 'P1');
+  const p2 = makeTank(W*0.75, H*0.5, PLAYER_PRESETS[1].color, 'P2');
+  const p3 = makeTank(W*0.75, H*0.25, PLAYER_PRESETS[2].color, 'P3');
+  const p4 = makeTank(W*0.25, H*0.75, PLAYER_PRESETS[3].color, 'P4');
+  const allPlayers = [p1, p2, p3, p4];
+  let players = [p1, p2];
   let bullets = [];
   let mines = [];
   let screenShake = 0;
@@ -1636,88 +1648,57 @@
   function resetRound(){
     bullets = []; mines = [];
     genMaze();
-    p1.x = arenaPadding + CW*0.5; p1.y = arenaPadding + CH*0.5; p1.a = -Math.PI/2;
-    p2.x = arenaPadding + (COLS-0.5)*CW; p2.y = arenaPadding + (ROWS-0.5)*CH; p2.a = -Math.PI/2;
+    const vSpawns = [
+      { x: arenaPadding + CW*0.5,         y: arenaPadding + CH*0.5,         a: -Math.PI/2 },
+      { x: arenaPadding + (COLS-0.5)*CW,  y: arenaPadding + (ROWS-0.5)*CH,  a: -Math.PI/2 },
+      { x: arenaPadding + (COLS-0.5)*CW,  y: arenaPadding + CH*0.5,         a: -Math.PI/2 },
+      { x: arenaPadding + CW*0.5,         y: arenaPadding + (ROWS-0.5)*CH,  a: -Math.PI/2 },
+    ];
+    players.forEach((t,i)=>{ const s=vSpawns[i]; t.x=s.x; t.y=s.y; t.a=s.a; });
     for(const t of players){ t.alive=true; t.hp=t.maxHp; t.showHpTimer=0; t.shotCounter=0; }
     msg.style.display='none';
   }
 
   function updateControls(t, dt){
-    // Apply global movement floor to prevent crawl
-    const minFloor = t.allowSlow ? 0.3 : 0.7; // 30% floor for extreme perks only
+    const minFloor = t.allowSlow ? 0.3 : 0.7;
     const effectiveThrust = Math.max(t.thrust, (t.baseThrust||180) * minFloor);
-    const playerKey = (t===p1) ? 'p1' : 'p2';
-    const isController = controlConfig[playerKey].type === 'controller';
-    if(!isController && t.control==='P1'){
-      const left = keys.has('a') || keys.has('A');
-      const right = keys.has('d') || keys.has('D');
-      const up = keys.has('w') || keys.has('W');
-      const down = keys.has('s') || keys.has('S');
-      const fire = keys.has('f') || keys.has('F');
-        
-        // Play reduced/rare turn sounds
-        if(left) { 
-          t.a -= t.rotSpeed*dt; 
-          if((t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer = 0.35; }
-        }
-        if(right) { 
-          t.a += t.rotSpeed*dt; 
-          if((t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer = 0.35; }
-        }
-        const dir = (up?1:0) + (down?-1:0);
-        // Play reduced/rare movement sound
-        if(dir !== 0 && (t.moveSfxTimer||0)<=0){ SFX.play('move'); t.moveSfxTimer = 0.35; }
-        const nx = t.x + Math.cos(t.a) * effectiveThrust * dir * dt;
-        const ny = t.y + Math.sin(t.a) * effectiveThrust * dir * dt;
-        attemptMove(t, nx, ny);
-        if(fire) tryFire(t);
-    } else if(!isController) {
-      const left = keys.has('ArrowLeft');
-      const right = keys.has('ArrowRight');
-      const up = keys.has('ArrowUp');
-      const down = keys.has('ArrowDown');
-      const fire = keys.has('/') || keys.has('?');
-        
-        // Play reduced/rare turn sounds
-        if(left) { 
-          t.a -= t.rotSpeed*dt; 
-          if((t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer = 0.35; }
-        }
-        if(right) { 
-          t.a += t.rotSpeed*dt; 
-          if((t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer = 0.35; }
-        }
-        const dir = (up?1:0) + (down?-1:0);
-        // Play reduced/rare movement sound
-        if(dir !== 0 && (t.moveSfxTimer||0)<=0){ SFX.play('move'); t.moveSfxTimer = 0.35; }
-        const nx = t.x + Math.cos(t.a) * effectiveThrust * dir * dt;
-        const ny = t.y + Math.sin(t.a) * effectiveThrust * dir * dt;
-        attemptMove(t, nx, ny);
-        if(fire) tryFire(t);
-    } else {
-      // Controller input
+    const pidx = players.indexOf(t);
+    const playerKey = `p${pidx+1}`;
+    const isController = controlConfig[playerKey]?.type === 'controller';
+    if(isController){
       const idx = gpIndex[playerKey];
       const gp = idx!=null ? gamepads[idx] : null;
       if(gp){
         const lx = applyDeadzone(gp.axes[0] || 0);
         const ly = applyDeadzone(gp.axes[1] || 0);
         const rx = applyDeadzone(gp.axes[2] != null ? gp.axes[2] : 0);
-        const ry = applyDeadzone(gp.axes[3] != null ? gp.axes[3] : 0);
-        // Rotation: prefer right-stick X, fallback to left-stick X
         const turnX = Math.abs(rx) > 0 ? rx : lx;
         t.a += turnX * t.rotSpeed * dt;
-        // Forward/back from left stick Y (up is negative)
         const dir = -ly;
         const nx = t.x + Math.cos(t.a) * effectiveThrust * dir * dt;
         const ny = t.y + Math.sin(t.a) * effectiveThrust * dir * dt;
         attemptMove(t, nx, ny);
-        // Fire on RT (7) / LT (6) / A (0) / B (1)
-        const firePressed = (gp.buttons[7] && gp.buttons[7].pressed) || (gp.buttons[6] && gp.buttons[6].pressed) || (gp.buttons[0] && gp.buttons[0].pressed) || (gp.buttons[1] && gp.buttons[1].pressed);
+        const firePressed = (gp.buttons[7]&&gp.buttons[7].pressed)||(gp.buttons[6]&&gp.buttons[6].pressed)||(gp.buttons[0]&&gp.buttons[0].pressed)||(gp.buttons[1]&&gp.buttons[1].pressed);
         if(firePressed) tryFire(t);
-        // Optional move/turn sfx throttle
-        if(Math.abs(turnX) > 0.2 && (t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer = 0.35; }
-        if(Math.abs(dir) > 0.2 && (t.moveSfxTimer||0)<=0){ SFX.play('move'); t.moveSfxTimer = 0.35; }
+        if(Math.abs(turnX)>0.2 && (t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer=0.35; }
+        if(Math.abs(dir)>0.2  && (t.moveSfxTimer||0)<=0){ SFX.play('move');  t.moveSfxTimer=0.35; }
       }
+    } else {
+      const kb = PLAYER_PRESETS[pidx]?.kb;
+      if(!kb) return;
+      const left  = keyPressed(kb.left);
+      const right = keyPressed(kb.right);
+      const up    = keyPressed(kb.up);
+      const down  = keyPressed(kb.down);
+      const fire  = keyPressed(kb.fire);
+      if(left)  { t.a -= t.rotSpeed*dt; if((t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer=0.35; } }
+      if(right) { t.a += t.rotSpeed*dt; if((t.turnSfxTimer||0)<=0){ SFX.play('turn'); t.turnSfxTimer=0.35; } }
+      const dir = (up?1:0)+(down?-1:0);
+      if(dir!==0 && (t.moveSfxTimer||0)<=0){ SFX.play('move'); t.moveSfxTimer=0.35; }
+      const nx = t.x + Math.cos(t.a)*effectiveThrust*dir*dt;
+      const ny = t.y + Math.sin(t.a)*effectiveThrust*dir*dt;
+      attemptMove(t, nx, ny);
+      if(fire) tryFire(t);
     }
   }
 
@@ -1881,7 +1862,7 @@
               if(!killer.zPerkThreshold) killer.zPerkThreshold = 5;
               if(!killer.zDraftOpen && killer.zKills >= killer.zPerkThreshold){
                 killer.zDraftOpen = true;
-                showDraft(killer, `Player ${killer===p1?1:2} — choose an upgrade`, ()=>{
+                showDraft(killer, `Player ${players.indexOf(killer)+1} — choose an upgrade`, ()=>{
                   killer.zDraftOpen = false;
                   // Gradual linear-increasing increments for mines credit path
                   const inc = (killer.zIncCurrent||3);
@@ -2000,8 +1981,7 @@
     const openness = 0.05 + 0.08*zone + 0.05*sub; // higher = more open
     genMaze(openness);
     // Reposition players on the left side, facing right
-    p1.x = arenaPadding + CW*0.5; p1.y = arenaPadding + innerH * 0.33; p1.a = 0; p1.alive = true; p1.hp = p1.maxHp; p1.showHpTimer = 1.0;
-    p2.x = arenaPadding + CW*0.5; p2.y = arenaPadding + innerH * 0.66; p2.a = 0; p2.alive = true; p2.hp = p2.maxHp; p2.showHpTimer = 1.0;
+    players.forEach((t,i)=>{ t.x=arenaPadding+CW*0.5; t.y=arenaPadding+innerH*(i+1)/(players.length+1); t.a=0; t.alive=true; t.hp=t.maxHp; t.showHpTimer=1.0; });
     // Clear transient state
     bullets = []; mines = []; motionTrails = []; particles = [];
     boss = null; bossActive = false;
@@ -2236,7 +2216,7 @@
         pierce: t.pierce,
         color: bulletColor,
         owner: t,
-        ownerTeam: (gameMode==='zombies') ? 'humans' : (t===p1 ? 'p1' : 'p2'),
+        ownerTeam: (gameMode==='zombies') ? 'humans' : `p${players.indexOf(t)+1}`,
         isPissMissile: t.hasPissMissiles || false
       });
     }
@@ -2525,22 +2505,226 @@
     };
   }
   
-  function openLoserChoice(loser){
-    showDraft(loser, `Player ${loser===p1?1:2} — choose an upgrade`, ()=>{
-      resetRound();
-      state = 'round';
+  // Draft keyboard bindings per player slot (left, right, confirm)
+  const DRAFT_KEYS = [
+    { left:['a','A'],        right:['d','D'],        confirm:['e','E']         },
+    { left:['ArrowLeft'],    right:['ArrowRight'],   confirm:['.','>']         },
+    { left:['j','J'],        right:['l','L'],        confirm:['p','P']         },
+    { left:['Numpad4'],      right:['Numpad6'],      confirm:['Numpad0']       },
+  ];
+
+  function showDraftAll(playerList, onAllDone){
+    if(!playerList.length){ onAllDone&&onAllDone(); return; }
+    const prevPaused = paused; paused = true;
+    SFX.play('menuOpen');
+
+    const cols = Math.min(2, playerList.length);
+    const wrapper = document.createElement('div');
+    Object.assign(wrapper.style,{
+      position:'fixed',inset:'0',display:'grid',
+      gridTemplateColumns:`repeat(${cols}, minmax(200px, 320px))`,
+      alignContent:'center',justifyContent:'center',
+      background:'rgba(0,0,0,0.88)',zIndex:'50',pointerEvents:'auto',
+      gap:'10px',padding:'16px',boxSizing:'border-box',overflowY:'auto',
     });
-  }
-  
-  function startMatchDraft(){
-    state = 'start_p1';
-    showDraft(p1, 'Player 1 — choose an upgrade', ()=>{
-      state = 'start_p2';
-      showDraft(p2, 'Player 2 — choose an upgrade', ()=>{
-        resetRound();
-        state = 'round';
+
+    let doneCount = 0;
+    const allKeyHandlers = [];
+    let allGpActive = true;
+
+    function checkAllDone(){
+      if(doneCount < playerList.length) return;
+      allKeyHandlers.forEach(h=>window.removeEventListener('keydown',h));
+      allGpActive = false;
+      try{ document.body.removeChild(wrapper); }catch(_e){}
+      paused = prevPaused;
+      onAllDone&&onAllDone();
+    }
+
+    playerList.forEach((player)=>{
+      const pidx    = players.indexOf(player);
+      const playerKey = `p${pidx+1}`;
+      const playerColor = player.color;
+      const kb = DRAFT_KEYS[pidx] || DRAFT_KEYS[0];
+
+      // ── panel ────────────────────────────────────────────
+      const panel = document.createElement('div');
+      Object.assign(panel.style,{
+        background:'#000',border:`3px solid ${playerColor}`,padding:'12px',
+        flex:'1',minWidth:'180px',maxWidth:'300px',display:'flex',
+        flexDirection:'column',boxSizing:'border-box',
       });
-    });
+
+      const h = document.createElement('div');
+      h.textContent = `P${pidx+1} — UPGRADE`;
+      Object.assign(h.style,{fontSize:'9px',marginBottom:'10px',textAlign:'center',
+        color:playerColor,fontFamily:"'Press Start 2P',monospace",fontWeight:'bold'});
+      panel.appendChild(h);
+
+      // ── reels ─────────────────────────────────────────────
+      const reelsRow = document.createElement('div');
+      Object.assign(reelsRow.style,{display:'flex',gap:'4px',justifyContent:'center',marginBottom:'8px'});
+
+      const makeReel=()=>{
+        const r=document.createElement('div');
+        Object.assign(r.style,{width:'72px',height:'72px',border:'2px solid #fff',background:'#000',overflow:'hidden',position:'relative'});
+        const strip=document.createElement('div');
+        Object.assign(strip.style,{position:'absolute',left:'0',right:'0',top:'0',willChange:'transform'});
+        r.appendChild(strip); r._strip=strip; r._cells=[]; r._value=null; r._pos=0; return r;
+      };
+      const reels=[makeReel(),makeReel(),makeReel()];
+      reels.forEach(r=>reelsRow.appendChild(r));
+      panel.appendChild(reelsRow);
+
+      // ── buttons ───────────────────────────────────────────
+      const controls=document.createElement('div');
+      Object.assign(controls.style,{display:'flex',gap:'4px',justifyContent:'center',flexWrap:'wrap',marginBottom:'8px'});
+
+      const mkBtn=(label,color)=>{
+        const b=document.createElement('button');
+        b.textContent=label;
+        Object.assign(b.style,{border:`2px solid ${color}`,background:'#000',color:'#fff',
+          padding:'5px 8px',cursor:'pointer',font:'8px "Press Start 2P"'});
+        return b;
+      };
+      const spinBtn=mkBtn('SPIN',playerColor);
+      const takeBtn=mkBtn('TAKE','#888'); takeBtn.disabled=true; takeBtn.style.color='#888'; takeBtn.style.cursor='not-allowed';
+      const mythBtn=mkBtn('MYTH!','#888'); mythBtn.disabled=true; mythBtn.style.color='#888'; mythBtn.style.cursor='not-allowed';
+      controls.appendChild(spinBtn); controls.appendChild(takeBtn); controls.appendChild(mythBtn);
+      panel.appendChild(controls);
+
+      // ── info ──────────────────────────────────────────────
+      const info=document.createElement('div');
+      Object.assign(info.style,{padding:'6px',minHeight:'36px',border:'1px solid #333',
+        color:'#fff',font:'7px "Press Start 2P"',lineHeight:'1.5'});
+      info.textContent='Press SPIN';
+      panel.appendChild(info);
+
+      wrapper.appendChild(panel);
+
+      // ── helpers ───────────────────────────────────────────
+      const rollRarity=()=>{ const r=Math.random(); if(r<0.005)return'mythical'; if(r<0.085)return'legendary'; if(r<0.335)return'rare'; return'common'; };
+      const pickByRarity=(rar)=>{ const pool=upgradePool.filter(u=>u.rarity===rar); return pool.length?choice(pool):choice(upgradePool); };
+      const rarityColor=(rar)=>{ switch(rar){ case'rare':return'#00aaff'; case'legendary':return'#ffdd00'; case'mythical':return'#ffff00'; default:return'#ffffff'; } };
+      const fmt=(up)=>`<div style="font-weight:bold;margin-bottom:2px;font-size:8px;font-family:'Press Start 2P',monospace;color:${rarityColor(up.rarity)}">${up.name}</div><div style="font-size:7px;color:#00ff88;">${up.good}</div><div style="font-size:7px;color:#ff4444;">${up.bad}</div>`;
+
+      const enableTake=(en)=>{ takeBtn.disabled=!en; takeBtn.style.border=en?`2px solid ${playerColor}`:'2px solid #888'; takeBtn.style.color=en?'#fff':'#888'; takeBtn.style.cursor=en?'pointer':'not-allowed'; };
+      const enableMyth=(en)=>{ mythBtn.disabled=!en; mythBtn.style.border=en?'2px solid #ffff00':'2px solid #888'; mythBtn.style.color=en?'#ffff00':'#888'; mythBtn.style.cursor=en?'pointer':'not-allowed'; };
+
+      let spinning=false, finalPicks=[], selectedReel=0, playerDone=false;
+
+      function pickUpgrade(up){
+        if(playerDone) return; playerDone=true;
+        SFX.play('menuSelect'); applyUpgrade(player,up);
+        panel.style.opacity='0.55'; panel.style.pointerEvents='none';
+        const ok=document.createElement('div'); ok.textContent='✓ TAKEN';
+        Object.assign(ok.style,{textAlign:'center',color:playerColor,font:'9px "Press Start 2P"',marginTop:'6px'});
+        panel.appendChild(ok);
+        doneCount++; checkAllDone();
+      }
+
+      function updateHighlight(){ reels.forEach((r,i)=>{ r.style.border=(i===selectedReel)?`3px solid ${playerColor}`:'2px solid #fff'; }); }
+      function updateInfo(){ const up=finalPicks[selectedReel]; if(up){info.innerHTML=fmt(up);}else{info.textContent='Press SPIN';} }
+
+      spinBtn.onclick=async()=>{
+        if(spinning||playerDone) return; spinning=true; enableTake(false); enableMyth(false); finalPicks=[]; SFX.play('menuSelect');
+        const cellH=26;
+        for(const r of reels){
+          r._strip.innerHTML=''; r._cells=[]; r._pos=0;
+          for(let j=0;j<18;j++){
+            const rar=rollRarity(); const up=pickByRarity(rar);
+            const cell=document.createElement('div');
+            Object.assign(cell.style,{height:cellH+'px',display:'flex',alignItems:'center',justifyContent:'center'});
+            cell.innerHTML=`<div style="width:100%;text-align:center;font-weight:bold;font-size:8px;font-family:'Press Start 2P',monospace;color:${rarityColor(up.rarity)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92%;">${up.name}</div>`;
+            cell._perk=up; r._strip.appendChild(cell); r._cells.push(cell);
+          }
+          r._strip.style.transform='translateY(0px)';
+        }
+        const startTime=performance.now(); const baseDur=3000; const stagger=600; const easeOut=t=>1-Math.pow(1-t,3);
+        await new Promise(res=>{
+          const stopAt=reels.map((_,i)=>startTime+baseDur+i*stagger); const done=reels.map(()=>false);
+          function step(){
+            const now=performance.now(); let allDone=true;
+            reels.forEach((r,idx)=>{
+              if(done[idx])return; allDone=false;
+              const localT=Math.min(1,(now-startTime)/(baseDur+idx*stagger));
+              const spd=(6+idx*0.9)*(1-easeOut(localT));
+              r._pos=(r._pos+Math.max(0.10,spd))%r._cells.length;
+              r._strip.style.transform=`translateY(${-(r._pos*cellH)}px)`;
+              if(Math.floor(r._pos*0.5)!==r._lastTick){ SFX.play('slotTick'); r._lastTick=Math.floor(r._pos*0.5); }
+              if(now>=stopAt[idx]){
+                const stopIndex=(Math.floor(r._pos)+idx*2)%r._cells.length;
+                const cell=r._cells[stopIndex]; const up=cell?cell._perk:pickByRarity(rollRarity());
+                r._strip.innerHTML=`<div style="height:100%;display:flex;align-items:center;justify-content:center"><div style="width:100%;text-align:center;font-weight:bold;font-size:8px;font-family:'Press Start 2P',monospace;color:${rarityColor(up.rarity)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92%;">${up.name}</div></div>`;
+                r._strip.style.transform='translateY(0)'; r._value=up; finalPicks[idx]=up; SFX.play('slotStop'); done[idx]=true;
+              }
+            });
+            if(allDone){res();}else{requestAnimationFrame(step);}
+          }
+          requestAnimationFrame(step);
+        });
+        SFX.play('slotFinish');
+        const counts={}; for(const up of finalPicks){ counts[up.name]=(counts[up.name]||0)+1; }
+        let jackpot=false; Object.values(counts).forEach(c=>{ if(c>=3)jackpot=true; });
+        if(jackpot){enableTake(true);enableMyth(true);}else{enableTake(true);enableMyth(false);}
+        updateHighlight(); updateInfo(); spinning=false;
+      };
+
+      reels.forEach((reel,idx)=>{
+        reel.onmouseenter=()=>{ selectedReel=idx; updateHighlight(); updateInfo(); };
+        reel.onclick=()=>{ if(takeBtn.disabled||playerDone)return; const up=reel._value||finalPicks[idx]; if(up)pickUpgrade(up); };
+      });
+      takeBtn.onclick=()=>{ if(takeBtn.disabled||playerDone)return; const up=finalPicks[selectedReel]; if(up)pickUpgrade(up); };
+      mythBtn.onclick=()=>{ if(mythBtn.disabled||playerDone)return; const myth=upgradePool.filter(u=>u.rarity==='mythical'); pickUpgrade(myth.length?choice(myth):pickByRarity('legendary')); };
+
+      // Keyboard handler for this player
+      function keyHandler(e){
+        if(playerDone) return;
+        const k=e.key; const c=e.code;
+        if(kb.left.includes(k)||kb.left.includes(c)){ selectedReel=(selectedReel+reels.length-1)%reels.length; updateHighlight(); updateInfo(); }
+        else if(kb.right.includes(k)||kb.right.includes(c)){ selectedReel=(selectedReel+1)%reels.length; updateHighlight(); updateInfo(); }
+        else if(kb.confirm.includes(k)||kb.confirm.includes(c)){
+          if(takeBtn.disabled){ if(!spinning)spinBtn.onclick(); return; }
+          const up=finalPicks[selectedReel]; if(up)pickUpgrade(up);
+        }
+      }
+      window.addEventListener('keydown', keyHandler);
+      allKeyHandlers.push(keyHandler);
+
+      // Controller polling for this player
+      let prev={left:false,right:false,select:false,myth:false,axisX:0};
+      function pollDraftGp(){
+        if(!allGpActive||playerDone) return;
+        pollGamepads();
+        const idx=gpIndex[playerKey]; const gp=idx!=null?gamepads[idx]:null;
+        if(gp){
+          const left=!!(gp.buttons[14]&&gp.buttons[14].pressed);
+          const right=!!(gp.buttons[15]&&gp.buttons[15].pressed);
+          const ax=applyDeadzone(gp.axes[0]||0);
+          const select=!!((gp.buttons[0]&&gp.buttons[0].pressed)||(gp.buttons[2]&&gp.buttons[2].pressed));
+          const myth=!!(gp.buttons[3]&&gp.buttons[3].pressed);
+          if((!prev.left&&left)||(prev.axisX>=0.5&&ax<=-0.5)){ selectedReel=(selectedReel+reels.length-1)%reels.length; updateHighlight(); updateInfo(); }
+          else if((!prev.right&&right)||(prev.axisX<=-0.5&&ax>=0.5)){ selectedReel=(selectedReel+1)%reels.length; updateHighlight(); updateInfo(); }
+          if(!prev.select&&select){ if(takeBtn.disabled){if(!spinning)spinBtn.onclick();}else{const up=finalPicks[selectedReel];if(up)pickUpgrade(up);} }
+          if(!prev.myth&&myth&&!mythBtn.disabled) mythBtn.onclick();
+          prev={left,right,select,myth,axisX:ax};
+        }
+        requestAnimationFrame(pollDraftGp);
+      }
+      requestAnimationFrame(pollDraftGp);
+    }); // end forEach player
+
+    document.body.appendChild(wrapper);
+  }
+
+  function openLoserChoice(losers, onDone){
+    if(!losers.length){ onDone(); return; }
+    showDraftAll(losers, onDone);
+  }
+
+  function startMatchDraft(){
+    state = 'draft';
+    showDraftAll(players, ()=>{ resetRound(); state='round'; });
   }
 
   // ----- control selection screen -----
@@ -2551,26 +2735,54 @@
     const wrapper = document.createElement('div');
     wrapper.id = 'controlSelection';
     Object.assign(wrapper.style, {
-      position:'fixed', inset:'0', display:'flex', alignItems:'center', justifyContent:'center',
-      background:'rgba(0,0,0,0.9)', zIndex:'200', pointerEvents:'auto'
+      position:'fixed', inset:'0', display:'flex', alignItems:'flex-start', justifyContent:'center',
+      background:'rgba(0,0,0,0.9)', zIndex:'200', pointerEvents:'auto',
+      overflowY:'auto', padding:'20px 0',
     });
 
     const panel = document.createElement('div');
     Object.assign(panel.style, {
-      background:'#000', border:'2px solid #ffffff', padding:'32px', minWidth:'600px'
+      background:'#000', border:'2px solid #ffffff', padding:'24px',
+      minWidth:'600px', maxWidth:'700px', width:'90%', boxSizing:'border-box',
     });
 
     const header = document.createElement('div');
     header.innerHTML = '<h1 style="margin:0 0 30px 0;color:#ffffff;text-align:center;font-size:24px;">CONTROL SELECTION</h1>';
     panel.appendChild(header);
 
-    // Player 1 Controls
-    const p1Section = createPlayerControlSection('p1', 'Player 1 (Pink)', '#ff69b4');
-    panel.appendChild(p1Section);
+    // Player count selector
+    const countRow = document.createElement('div');
+    countRow.style.cssText = 'margin-bottom:24px;text-align:center;';
+    countRow.innerHTML = '<div style="color:#fff;font-family:Press Start 2P,monospace;font-size:11px;margin-bottom:10px;">NUMBER OF PLAYERS</div>';
+    const countBtns = document.createElement('div');
+    countBtns.style.cssText = 'display:flex;gap:10px;justify-content:center;';
+    [2,3,4].forEach(n=>{
+      const btn = document.createElement('button');
+      btn.id = `countBtn${n}`;
+      btn.textContent = n;
+      const active = ()=> n===playerCount;
+      const applyStyle = ()=>{ btn.style.cssText=`padding:10px 24px;font-family:Press Start 2P,monospace;font-size:14px;font-weight:bold;cursor:pointer;border:2px solid #fff;background:${active()?'#fff':'#000'};color:${active()?'#000':'#fff'};`; };
+      applyStyle();
+      btn.onclick=()=>{
+        playerCount=n;
+        [2,3,4].forEach(x=>{ const b=document.getElementById(`countBtn${x}`); if(b){ const a=x===playerCount; b.style.background=a?'#fff':'#000'; b.style.color=a?'#000':'#fff'; } });
+        // show/hide extra player sections
+        [3,4].forEach(x=>{ const s=document.getElementById(`p${x}Section`); if(s) s.style.display=playerCount>=x?'block':'none'; });
+        rebuildFocusIds();
+      };
+      countBtns.appendChild(btn);
+    });
+    countRow.appendChild(countBtns);
+    panel.appendChild(countRow);
 
-    // Player 2 Controls
-    const p2Section = createPlayerControlSection('p2', 'Player 2 (Blue)', '#0080ff');
-    panel.appendChild(p2Section);
+    // Player sections
+    const pSectionNames = ['Player 1 (Pink)','Player 2 (Blue)','Player 3 (Green)','Player 4 (Orange)'];
+    ['p1','p2','p3','p4'].forEach((pk,i)=>{
+      const sec = createPlayerControlSection(pk, pSectionNames[i], PLAYER_PRESETS[i].color);
+      sec.id = `p${i+1}Section`;
+      if(i>=2) sec.style.display = playerCount>i ? 'block':'none';
+      panel.appendChild(sec);
+    });
 
     // Start Game Button
     const startBtn = document.createElement('button');
@@ -2578,8 +2790,8 @@
     startBtn.style.cssText = 'width:100%;margin:20px 0;padding:16px;background:#ffffff;color:#000;border:none;cursor:pointer;font-weight:800;font-size:18px;font-family:Press Start 2P,monospace;';
     startBtn.id = 'startGameBtn';
     startBtn.onclick = () => {
-      // Play menu select sound
       SFX.play('menuSelect');
+      players = allPlayers.slice(0, playerCount);
       document.body.removeChild(wrapper);
       if(gameMode === 'versus'){
         state = 'start_p1';
@@ -2595,6 +2807,12 @@
 
     // Controller navigation for control selection screen
     let focusIds = ['p1Keyboard','p1Controller','p2Keyboard','p2Controller','startGameBtn'];
+    function rebuildFocusIds(){
+      focusIds = [];
+      for(let i=1;i<=playerCount;i++) focusIds.push(`p${i}Keyboard`,`p${i}Controller`);
+      focusIds.push('startGameBtn');
+    }
+    rebuildFocusIds();
     let focusIndex = 4; // default to Start Game
     function setFocus(idx){
       const prevEl = document.getElementById(focusIds[focusIndex]);
@@ -2845,19 +3063,23 @@
 
   // Control configuration
   let controlConfig = {
-    p1: { type: 'keyboard', controls: { up: 'w', down: 's', left: 'a', right: 'd', fire: 'f' } },
-    p2: { type: 'keyboard', controls: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', fire: '/' } }
+    p1: { type: 'keyboard', controls: { up: 'w',       down: 's',         left: 'a',         right: 'd',         fire: 'f'       } },
+    p2: { type: 'keyboard', controls: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', fire: '/'       } },
+    p3: { type: 'keyboard', controls: { up: 'i',       down: 'k',         left: 'j',         right: 'l',         fire: 'p'       } },
+    p4: { type: 'keyboard', controls: { up: 'Numpad8', down: 'Numpad2',   left: 'Numpad4',   right: 'Numpad6',   fire: 'Numpad0' } },
   };
   
   // Controller mapping
   let controllerMapping = {
     p1: { leftStick: 'move', rightStick: 'rotate', fire: 'RT' },
-    p2: { leftStick: 'move', rightStick: 'rotate', fire: 'LT' }
+    p2: { leftStick: 'move', rightStick: 'rotate', fire: 'LT' },
+    p3: { leftStick: 'move', rightStick: 'rotate', fire: 'RT' },
+    p4: { leftStick: 'move', rightStick: 'rotate', fire: 'LT' },
   };
 
   // ---------- controllers (Gamepad API) ----------
   const DEADZONE = 0.2;
-  let gpIndex = { p1: null, p2: null };
+  let gpIndex = { p1: null, p2: null, p3: null, p4: null };
   let gamepads = {};
 
   function applyDeadzone(v){ return Math.abs(v) < DEADZONE ? 0 : v; }
@@ -2881,8 +3103,8 @@
   }
 
   function assignGamepadTo(playerKey){
-    const other = playerKey === 'p1' ? 'p2' : 'p1';
-    const idx = findAvailableGamepad([gpIndex[other]]);
+    const otherIndices = ['p1','p2','p3','p4'].filter(k=>k!==playerKey).map(k=>gpIndex[k]).filter(v=>v!=null);
+    const idx = findAvailableGamepad(otherIndices);
     gpIndex[playerKey] = idx;
     updateControlDisplay(playerKey);
   }
@@ -2892,7 +3114,12 @@
     const obj = {}; for(const t of tokens){ const [k,v] = t.split('='); if(k){ obj[k] = v; } } return obj;
   }
   function getPlayerFromArg(arg){
-    if(!arg) return null; const v = String(arg).toLowerCase(); if(v==='p1'||v==='1'||v==='player1') return p1; if(v==='p2'||v==='2'||v==='player2') return p2; return null;
+    if(!arg) return null;
+    const v = String(arg).toLowerCase();
+    for(let i=0;i<allPlayers.length;i++){
+      if(v===`p${i+1}`||v===`${i+1}`||v===`player${i+1}`) return allPlayers[i];
+    }
+    return null;
   }
   function cmdHelp(){
     logDev('Commands:');
@@ -3585,7 +3812,7 @@
 
   function showWinOverlay(winner){
     if(!winOverlay) return;
-    if(winTitle) winTitle.textContent = `PLAYER ${winner===p1?1:2} WINS`;
+    if(winTitle) winTitle.textContent = `PLAYER ${players.indexOf(winner)+1} WINS`;
     winOverlay.style.display = 'flex';
     if(playAgainBtn){
       playAgainBtn.onclick = ()=>{ SFX.play('menuSelect'); resetMatch(); };
@@ -3599,7 +3826,7 @@
     
     if(!zCompleteOverlay) return;
     
-    const totalKills = (p1.zKills||0) + (p2.zKills||0);
+    const totalKills = players.reduce((s,p)=>s+(p.zKills||0),0);
     if(zCompleteStats) zCompleteStats.textContent = `All levels completed! Total Kills: ${totalKills}`;
     
     zCompleteOverlay.style.display = 'flex';
@@ -3620,8 +3847,7 @@
     const gdt = deathAnim.active ? dt*0.25 : dt;
     pollGamepads();
     // Auto-assign controllers if selected but not yet bound
-    if(controlConfig.p1.type === 'controller' && gpIndex.p1 == null){ assignGamepadTo('p1'); }
-    if(controlConfig.p2.type === 'controller' && gpIndex.p2 == null){ assignGamepadTo('p2'); }
+    for(let i=0;i<players.length;i++){ const k=`p${i+1}`; if(controlConfig[k]?.type==='controller' && gpIndex[k]==null) assignGamepadTo(k); }
 
     if(state==='round'){
       for(const t of players){ if(!t.alive) continue; updateControls(t,gdt); t.fireTimer=Math.max(0,t.fireTimer-gdt); if(t.showHpTimer>0) t.showHpTimer-=gdt; t.moveSfxTimer=Math.max(0,(t.moveSfxTimer||0)-gdt); t.turnSfxTimer=Math.max(0,(t.turnSfxTimer||0)-gdt); }
@@ -3733,23 +3959,18 @@
       if(alive.length<=1){
         if(alive.length===1){
           const winner = alive[0];
-          const loser  = (winner===p1) ? p2 : p1;
+          const losers = players.filter(p=>p!==winner);
           winner.score++; refreshScores();
-          // Show winner message under death overlay if present
-          if(deathOverlay){ if(deathSubtext) deathSubtext.textContent = `P${winner===p1?1:2} wins the round!`; }
-          // Hide legacy msg to avoid overlap with overlay
+          if(deathOverlay){ if(deathSubtext) deathSubtext.textContent = `P${players.indexOf(winner)+1} wins the round!`; }
           msg.style.display='none'; msg.textContent='';
-          // Play round win sound
           SFX.play('roundWin');
           if(winner.score>=ROUND_WINS){
             state='over';
-            // Play match win sound
             SFX.play('matchWin');
-            // Show final win screen after death overlay animation
             setTimeout(()=>{ showWinOverlay(winner); }, 2300);
           } else {
             state='draft';
-            setTimeout(()=>{ msg.style.display='none'; openLoserChoice(loser); }, 2000);
+            setTimeout(()=>{ msg.style.display='none'; openLoserChoice(losers, ()=>{ resetRound(); state='round'; }); }, 2000);
           }
         } else {
           msg.style.display='block'; msg.textContent='Double KO!';
@@ -3844,7 +4065,7 @@
                       if(!killer.zPerkThreshold) killer.zPerkThreshold = 5;
                       if(!killer.zDraftOpen && killer.zKills >= killer.zPerkThreshold){
                         killer.zDraftOpen = true;
-                        showDraft(killer, `Player ${killer===p1?1:2} — choose an upgrade`, ()=>{
+                        showDraft(killer, `Player ${players.indexOf(killer)+1} — choose an upgrade`, ()=>{
                           killer.zDraftOpen = false;
                           // Gradual linear-increasing increments for mines credit path
                           const inc = (killer.zIncCurrent||3);
@@ -3902,7 +4123,7 @@
                 if(!killer.zPerkThreshold) killer.zPerkThreshold = 5;
                 if(!killer.zDraftOpen && killer.zKills >= killer.zPerkThreshold){
                   killer.zDraftOpen = true;
-                  showDraft(killer, `Player ${killer===p1?1:2} — choose an upgrade`, ()=>{
+                  showDraft(killer, `Player ${players.indexOf(killer)+1} — choose an upgrade`, ()=>{
                     killer.zDraftOpen = false;
                     // Gradual linear-increasing increments: 3,5,7,9,...
                     const inc = (killer.zIncCurrent||3);
@@ -4005,7 +4226,7 @@
         state = 'z_over';
         // Show zombies game over screen with stats
         if(zOverOverlay && zOverStats){
-          const totalKills = (p1.zKills||0) + (p2.zKills||0);
+          const totalKills = players.reduce((s,p)=>s+(p.zKills||0),0);
           zOverStats.textContent = `You reached Level ${currentLevel + 1}. Total Kills: ${totalKills}`;
           zOverOverlay.style.display = 'flex';
         }
@@ -4070,20 +4291,31 @@
 
   // ---------- sidebar/score helpers ----------
   function refreshScores(){
-    p1ScoreEl.textContent = p1.score;
-    p2ScoreEl.textContent = p2.score;
-    p1ScoreEl.style.borderColor = p1.color;
-    p2ScoreEl.style.borderColor = p2.color;
+    const scoresEl = document.getElementById('scores');
+    if(!scoresEl) return;
+    scoresEl.innerHTML = '';
+    players.forEach((p,i)=>{
+      const el = document.createElement('div');
+      el.className = 'scoreBadge';
+      el.textContent = p.score;
+      el.style.borderColor = p.color;
+      el.style.color = p.color;
+      scoresEl.appendChild(el);
+    });
   }
 
   function refreshKills(){
-    if(!p1KillsEl || !p2KillsEl) return;
-    const k1 = p1.zKills || 0;
-    const k2 = p2.zKills || 0;
-    p1KillsEl.textContent = `K: ${k1}`;
-    p2KillsEl.textContent = `K: ${k2}`;
-    p1KillsEl.style.borderColor = p1.color;
-    p2KillsEl.style.borderColor = p2.color;
+    const killsEl = document.getElementById('kills');
+    if(!killsEl) return;
+    killsEl.innerHTML = '';
+    players.forEach((p,i)=>{
+      const el = document.createElement('div');
+      el.className = 'scoreBadge';
+      el.textContent = `K: ${p.zKills||0}`;
+      el.style.borderColor = p.color;
+      el.style.color = p.color;
+      killsEl.appendChild(el);
+    });
   }
 
   // ----- perk list render -----
@@ -4103,7 +4335,7 @@
         line-height: 1.2;
       `;
       
-      col.innerHTML = `<div style="color: ${p.color}; font-weight: bold; margin-bottom: 3px;">P${p===p1?1:2} PERKS</div>`;
+      col.innerHTML = `<div style="color: ${p.color}; font-weight: bold; margin-bottom: 3px;">P${players.indexOf(p)+1} PERKS</div>`;
       
       if(p.perks && p.perks.length > 0){
         for(const perk of p.perks){

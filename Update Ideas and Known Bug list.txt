@@ -1,0 +1,20 @@
+Tank Gambling major goals
+--------------------------
+
+---------------Rebalance the perk system to be more fun----------------------
+-----------------------------------------------------------------------------
+---------------Make zombies an infinite side scroller type game--------------
+-----------------------------------------------------------------------------
+---------------Make a better animation for the slot machine------------------
+-------------------(Flashing Lights, Spinning Wheel, "Winner Gagnant")-------
+-
+---------------Add a hidden jumpscare or 1/1000 chance on death 
+
+
+
+Known Bugs:
+
+Fix ShowDraftAll menu sizing
+
+Fix Slot machine text bug
+
